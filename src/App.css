@@ -12,11 +12,13 @@ body,
 
 body {
   min-height: 100vh;
+
   font-family:
     Inter,
     Arial,
     Helvetica,
     sans-serif;
+
   background: #03050b;
 }
 
@@ -30,7 +32,7 @@ button {
 }
 
 /* =========================
-   GLOBAL APP BACKGROUND
+   GLOBAL APP
    ========================= */
 
 .app {
@@ -41,6 +43,8 @@ button {
   align-items: center;
 
   padding: 30px 16px;
+
+  color: white;
 
   background:
     radial-gradient(
@@ -54,8 +58,6 @@ button {
       transparent 32%
     ),
     #03050b;
-
-  color: white;
 }
 
 /* =========================
@@ -69,10 +71,13 @@ button {
   width: min(390px, 100%);
   min-height: 760px;
 
-  border: 1px solid rgba(255, 42, 184, 0.55);
-  border-radius: 32px;
-
   padding: 38px 24px 28px;
+
+  border:
+    1px solid
+    rgba(255, 42, 184, 0.55);
+
+  border-radius: 32px;
 
   background:
     linear-gradient(
@@ -82,12 +87,14 @@ button {
     );
 
   box-shadow:
-    0 0 35px rgba(255, 0, 170, 0.12),
-    inset 0 0 30px rgba(132, 0, 255, 0.05);
+    0 0 35px
+      rgba(255, 0, 170, 0.12),
+    inset 0 0 30px
+      rgba(132, 0, 255, 0.05);
 }
 
 /* =========================
-   BACKGROUND GLOWS
+   GLOWS
    ========================= */
 
 .glow {
@@ -97,7 +104,9 @@ button {
   height: 220px;
 
   border-radius: 50%;
+
   filter: blur(70px);
+
   opacity: 0.25;
 }
 
@@ -149,7 +158,8 @@ button {
 
   text-shadow:
     0 0 10px #ff1cad,
-    0 0 25px rgba(255, 0, 170, 0.5);
+    0 0 25px
+      rgba(255, 0, 170, 0.5);
 }
 
 .crown {
@@ -164,10 +174,11 @@ button {
 .tagline {
   margin-top: 8px;
 
-  font-size: 12px;
-  letter-spacing: 2.4px;
-
   color: #cdd3e5;
+
+  font-size: 12px;
+
+  letter-spacing: 2.4px;
 }
 
 .hero {
@@ -193,7 +204,8 @@ button {
   text-shadow:
     0 0 10px #ffffff,
     0 0 22px #ff00ae,
-    0 0 50px rgba(255, 0, 170, 0.7);
+    0 0 50px
+      rgba(255, 0, 170, 0.7);
 }
 
 .actions {
@@ -208,15 +220,16 @@ button {
 .install-button {
   width: 100%;
 
-  border-radius: 12px;
-
   padding: 15px 18px;
+
+  border-radius: 12px;
 }
 
 .primary-button {
   border: none;
 
   color: white;
+
   font-weight: 800;
 
   background:
@@ -227,43 +240,27 @@ button {
     );
 
   box-shadow:
-    0 0 20px rgba(255, 0, 170, 0.3);
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.primary-button:hover {
-  transform: translateY(-1px);
-
-  box-shadow:
-    0 0 28px rgba(255, 0, 170, 0.5);
+    0 0 20px
+      rgba(255, 0, 170, 0.3);
 }
 
 .secondary-button {
   color: white;
+
   font-weight: 700;
 
-  border: 1px solid #778099;
+  border:
+    1px solid
+    #778099;
 
   background:
     rgba(8, 11, 21, 0.75);
-
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.secondary-button:hover {
-  border-color: #ff1cad;
-
-  box-shadow:
-    0 0 15px rgba(255, 28, 173, 0.2);
 }
 
 .no-account {
-  margin: 13px 0 24px;
+  margin:
+    13px 0
+    24px;
 
   color: #8f96a9;
 
@@ -275,62 +272,50 @@ button {
 
   border: none;
 
-  background: transparent;
-
   color: #e7eaf5;
-}
 
-.install-button:hover {
-  color: #ff48c5;
+  background: transparent;
 }
 
 /* =========================
-   SELECT VENUE SCREEN
+   SHARED TOP BAR
    ========================= */
-
-.venue-shell {
-  padding: 0;
-}
-
-.venue-content {
-  position: relative;
-  z-index: 2;
-
-  min-height: 758px;
-
-  padding: 24px 20px 20px;
-
-  display: flex;
-  flex-direction: column;
-}
 
 .top-bar {
   display: grid;
-  grid-template-columns: 40px 1fr 40px;
+
+  grid-template-columns:
+    40px
+    1fr
+    40px;
+
   align-items: center;
 
   margin-bottom: 28px;
 }
 
-.back-button {
+.back-button,
+.more-button {
   width: 38px;
   height: 38px;
 
   display: grid;
   place-items: center;
 
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.12);
+
   border-radius: 50%;
 
   color: white;
-  background: rgba(255, 255, 255, 0.04);
+
+  background:
+    rgba(255, 255, 255, 0.04);
 }
 
-.back-button:hover {
-  border-color: rgba(255, 49, 181, 0.5);
-
-  box-shadow:
-    0 0 12px rgba(255, 49, 181, 0.18);
+.more-button {
+  font-weight: 900;
 }
 
 .mini-brand {
@@ -352,12 +337,37 @@ button {
   width: 40px;
 }
 
+/* =========================
+   VENUE SELECT SCREEN
+   ========================= */
+
+.venue-shell {
+  padding: 0;
+}
+
+.venue-content {
+  position: relative;
+  z-index: 2;
+
+  min-height: 758px;
+
+  padding:
+    24px
+    20px
+    20px;
+
+  display: flex;
+  flex-direction: column;
+}
+
 .venue-heading {
   margin-bottom: 22px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
+  margin:
+    0 0
+    8px;
 
   color: #ff40bc;
 
@@ -371,11 +381,12 @@ button {
   margin: 0;
 
   font-size: 30px;
-  line-height: 1.1;
 }
 
 .venue-heading > p:last-child {
-  margin: 8px 0 0;
+  margin:
+    8px 0
+    0;
 
   color: #9199ad;
 
@@ -389,9 +400,13 @@ button {
   align-items: center;
   gap: 10px;
 
-  padding: 0 14px;
+  padding:
+    0 14px;
 
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.12);
+
   border-radius: 12px;
 
   background: #0b101c;
@@ -410,6 +425,7 @@ button {
   outline: none;
 
   color: white;
+
   background: transparent;
 
   font-size: 13px;
@@ -420,7 +436,9 @@ button {
 }
 
 .section-title {
-  margin: 25px 2px 12px;
+  margin:
+    25px 2px
+    12px;
 
   display: flex;
   align-items: center;
@@ -449,16 +467,26 @@ button {
   width: 100%;
 
   display: grid;
-  grid-template-columns: 58px 1fr 20px;
+
+  grid-template-columns:
+    58px
+    1fr
+    20px;
+
   align-items: center;
+
   gap: 12px;
 
   padding: 10px;
 
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.1);
+
   border-radius: 14px;
 
   color: white;
+
   text-align: left;
 
   background:
@@ -467,24 +495,11 @@ button {
       rgba(14, 19, 32, 0.96),
       rgba(8, 12, 22, 0.96)
     );
-
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.venue-card:hover {
-  transform: translateY(-1px);
-
-  border-color: rgba(255, 42, 184, 0.55);
-
-  box-shadow:
-    0 0 18px rgba(255, 0, 170, 0.12);
 }
 
 .active-venue {
-  border-color: rgba(255, 42, 184, 0.35);
+  border-color:
+    rgba(255, 42, 184, 0.35);
 }
 
 .venue-image {
@@ -518,7 +533,8 @@ button {
     );
 
   box-shadow:
-    0 0 18px rgba(255, 28, 172, 0.25);
+    0 0 18px
+      rgba(255, 28, 172, 0.25);
 }
 
 .venue-info {
@@ -526,7 +542,9 @@ button {
 }
 
 .venue-info h3 {
-  margin: 0 0 4px;
+  margin:
+    0 0
+    4px;
 
   font-size: 14px;
 }
@@ -538,20 +556,24 @@ button {
 }
 
 .live-pill {
-  padding: 3px 6px;
+  padding:
+    3px 6px;
 
   border-radius: 5px;
 
   color: #ff56c6;
 
-  background: rgba(255, 29, 173, 0.13);
+  background:
+    rgba(255, 29, 173, 0.13);
 
   font-size: 8px;
   font-weight: 900;
 }
 
 .venue-info p {
-  margin: 0 0 3px;
+  margin:
+    0 0
+    3px;
 
   color: #5de1bd;
 
@@ -570,6 +592,430 @@ button {
   font-size: 24px;
 }
 
+/* =========================
+   VENUE HOME
+   ========================= */
+
+.venue-home-shell {
+  padding: 0;
+}
+
+.venue-home-content {
+  position: relative;
+  z-index: 2;
+
+  min-height: 758px;
+
+  padding:
+    24px
+    20px
+    20px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.venue-live-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  margin-bottom: 18px;
+}
+
+.venue-live-header h2 {
+  margin: 0;
+
+  font-size: 32px;
+}
+
+.venue-subtext {
+  margin:
+    5px 0
+    0;
+
+  color: #8f96a9;
+
+  font-size: 12px;
+}
+
+.large-live-pill {
+  padding:
+    7px 10px;
+
+  border:
+    1px solid
+    rgba(255, 43, 184, 0.45);
+
+  border-radius: 8px;
+
+  color: #ff4bc2;
+
+  background:
+    rgba(255, 0, 170, 0.11);
+
+  font-size: 10px;
+  font-weight: 900;
+
+  letter-spacing: 1px;
+}
+
+.now-playing-card {
+  position: relative;
+  overflow: hidden;
+
+  padding: 16px;
+
+  border:
+    1px solid
+    rgba(255, 48, 184, 0.28);
+
+  border-radius: 18px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 0, 170, 0.09),
+      rgba(36, 25, 77, 0.18),
+      rgba(8, 12, 22, 0.96)
+    );
+
+  box-shadow:
+    0 0 25px
+      rgba(255, 0, 170, 0.08);
+}
+
+.album-art {
+  position: relative;
+
+  width: 100%;
+  height: 150px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 14px;
+
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      135deg,
+      #1b2037,
+      #501174,
+      #fc148f
+    );
+}
+
+.album-art span {
+  position: relative;
+  z-index: 2;
+
+  font-size: 52px;
+}
+
+.album-glow {
+  position: absolute;
+
+  width: 130px;
+  height: 130px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(255, 255, 255, 0.13);
+
+  filter: blur(25px);
+}
+
+.now-playing-label {
+  margin-bottom: 7px;
+
+  color: #ff4bc2;
+
+  font-size: 9px;
+  font-weight: 900;
+
+  letter-spacing: 1.6px;
+}
+
+.now-playing-card h3 {
+  margin: 0;
+
+  font-size: 22px;
+}
+
+.now-playing-card p {
+  margin:
+    5px 0
+    13px;
+
+  color: #9ba3b8;
+
+  font-size: 12px;
+}
+
+.song-progress {
+  width: 100%;
+  height: 5px;
+
+  overflow: hidden;
+
+  border-radius: 20px;
+
+  background:
+    rgba(255, 255, 255, 0.1);
+}
+
+.song-progress-fill {
+  width: 41%;
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #ff1cab,
+      #9d42ff
+    );
+}
+
+.song-time {
+  display: flex;
+  justify-content: space-between;
+
+  margin-top: 6px;
+
+  color: #737c93;
+
+  font-size: 9px;
+}
+
+/* =========================
+   CROWD
+   ========================= */
+
+.crowd-section {
+  margin-top: 18px;
+}
+
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-heading-row h3 {
+  margin: 0;
+
+  font-size: 16px;
+}
+
+.crowd-score {
+  color: #58e5bf;
+
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.reaction-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 8px;
+
+  margin-top: 12px;
+}
+
+.reaction-button {
+  display: grid;
+  place-items: center;
+
+  gap: 4px;
+
+  padding:
+    11px 5px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.09);
+
+  border-radius: 12px;
+
+  color: white;
+
+  background:
+    rgba(12, 17, 29, 0.92);
+}
+
+.reaction-button span {
+  font-size: 22px;
+}
+
+.reaction-button small {
+  color: #8d95a8;
+
+  font-size: 9px;
+}
+
+/* =========================
+   REQUEST BUTTON
+   ========================= */
+
+.request-song-button {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    40px
+    1fr
+    20px;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 18px;
+
+  padding: 14px;
+
+  border: none;
+
+  border-radius: 14px;
+
+  color: white;
+
+  text-align: left;
+
+  background:
+    linear-gradient(
+      90deg,
+      #ff1aa9,
+      #b020ff
+    );
+
+  box-shadow:
+    0 0 24px
+      rgba(255, 0, 170, 0.22);
+}
+
+.request-icon {
+  width: 36px;
+  height: 36px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background:
+    rgba(255, 255, 255, 0.15);
+
+  font-size: 24px;
+}
+
+.request-button-text {
+  display: grid;
+  gap: 2px;
+}
+
+.request-button-text strong {
+  font-size: 14px;
+}
+
+.request-button-text small {
+  color:
+    rgba(255, 255, 255, 0.78);
+
+  font-size: 9px;
+}
+
+.request-arrow {
+  font-size: 24px;
+}
+
+/* =========================
+   QUICK ACTIONS
+   ========================= */
+
+.quick-actions-section {
+  margin-top: 18px;
+}
+
+.text-button {
+  border: none;
+
+  color: #ff49c4;
+
+  background: transparent;
+
+  font-size: 9px;
+}
+
+.quick-action-grid {
+  display: grid;
+
+  grid-template-columns:
+    1fr
+    1fr;
+
+  gap: 10px;
+
+  margin-top: 10px;
+}
+
+.quick-action-card {
+  display: flex;
+  flex-direction: column;
+
+  gap: 5px;
+
+  min-height: 100px;
+
+  padding: 13px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.09);
+
+  border-radius: 14px;
+
+  color: white;
+
+  text-align: left;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(20, 24, 39, 0.97),
+      rgba(8, 11, 20, 0.97)
+    );
+}
+
+.quick-action-card span {
+  font-size: 23px;
+}
+
+.quick-action-card strong {
+  font-size: 11px;
+}
+
+.quick-action-card small {
+  color: #747d91;
+
+  font-size: 8px;
+}
+
+/* =========================
+   FOOTER
+   ========================= */
+
 .venue-footer {
   margin-top: auto;
 
@@ -579,7 +1025,9 @@ button {
   align-items: center;
   justify-content: space-around;
 
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.08);
 
   color: #747c91;
 
@@ -590,11 +1038,12 @@ button {
   color: #ff31b5;
 
   text-shadow:
-    0 0 10px rgba(255, 49, 181, 0.7);
+    0 0 10px
+      rgba(255, 49, 181, 0.7);
 }
 
 /* =========================
-   MOBILE RESPONSIVE
+   MOBILE
    ========================= */
 
 @media (max-width: 430px) {
@@ -611,10 +1060,12 @@ button {
   }
 
   .welcome-content {
-    min-height: calc(100vh - 66px);
+    min-height:
+      calc(100vh - 66px);
   }
 
-  .venue-content {
+  .venue-content,
+  .venue-home-content {
     min-height: 100vh;
   }
 }
