@@ -12,18 +12,13 @@ body,
 
 body {
   min-height: 100vh;
-
-  font-family:
-    Inter,
-    Arial,
-    Helvetica,
-    sans-serif;
-
+  font-family: Inter, Arial, Helvetica, sans-serif;
   background: #03050b;
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -32,18 +27,15 @@ button {
 }
 
 /* =========================
-   GLOBAL APP
+   GLOBAL
    ========================= */
 
 .app {
   min-height: 100vh;
-
   display: flex;
   justify-content: center;
   align-items: center;
-
   padding: 30px 16px;
-
   color: white;
 
   background:
@@ -60,23 +52,14 @@ button {
     #03050b;
 }
 
-/* =========================
-   PHONE SHELL
-   ========================= */
-
 .phone-shell {
   position: relative;
   overflow: hidden;
-
   width: min(390px, 100%);
   min-height: 760px;
-
   padding: 38px 24px 28px;
 
-  border:
-    1px solid
-    rgba(255, 42, 184, 0.55);
-
+  border: 1px solid rgba(255, 42, 184, 0.55);
   border-radius: 32px;
 
   background:
@@ -87,51 +70,39 @@ button {
     );
 
   box-shadow:
-    0 0 35px
-      rgba(255, 0, 170, 0.12),
-    inset 0 0 30px
-      rgba(132, 0, 255, 0.05);
+    0 0 35px rgba(255, 0, 170, 0.12),
+    inset 0 0 30px rgba(132, 0, 255, 0.05);
 }
-
-/* =========================
-   GLOWS
-   ========================= */
 
 .glow {
   position: absolute;
-
   width: 220px;
   height: 220px;
-
   border-radius: 50%;
-
   filter: blur(70px);
-
   opacity: 0.25;
+  pointer-events: none;
 }
 
 .glow-one {
   top: 40px;
   left: -80px;
-
   background: #ff008c;
 }
 
 .glow-two {
   right: -100px;
   bottom: 80px;
-
   background: #4d3cff;
 }
 
 /* =========================
-   WELCOME SCREEN
+   WELCOME
    ========================= */
 
 .welcome-content {
   position: relative;
   z-index: 2;
-
   min-height: 690px;
 
   display: flex;
@@ -147,45 +118,33 @@ button {
 
 .brand h1 {
   margin: 0;
-
   font-size: 46px;
   font-weight: 900;
   font-style: italic;
-
   letter-spacing: -3px;
-
   transform: skew(-7deg);
 
   text-shadow:
     0 0 10px #ff1cad,
-    0 0 25px
-      rgba(255, 0, 170, 0.5);
+    0 0 25px rgba(255, 0, 170, 0.5);
 }
 
 .crown {
   color: #ff1cad;
-
   font-size: 36px;
-
-  text-shadow:
-    0 0 14px #ff1cad;
+  text-shadow: 0 0 14px #ff1cad;
 }
 
 .tagline {
   margin-top: 8px;
-
   color: #cdd3e5;
-
   font-size: 12px;
-
   letter-spacing: 2.4px;
 }
 
 .hero {
   flex: 1;
-
   width: 100%;
-
   display: grid;
   place-items: center;
 }
@@ -194,7 +153,6 @@ button {
   font-size: 120px;
   font-weight: 900;
   font-style: italic;
-
   letter-spacing: -10px;
 
   transform:
@@ -202,15 +160,13 @@ button {
     skew(-8deg);
 
   text-shadow:
-    0 0 10px #ffffff,
+    0 0 10px #fff,
     0 0 22px #ff00ae,
-    0 0 50px
-      rgba(255, 0, 170, 0.7);
+    0 0 50px rgba(255, 0, 170, 0.7);
 }
 
 .actions {
   width: 100%;
-
   display: grid;
   gap: 12px;
 }
@@ -219,17 +175,13 @@ button {
 .secondary-button,
 .install-button {
   width: 100%;
-
   padding: 15px 18px;
-
   border-radius: 12px;
 }
 
 .primary-button {
   border: none;
-
   color: white;
-
   font-weight: 800;
 
   background:
@@ -240,57 +192,37 @@ button {
     );
 
   box-shadow:
-    0 0 20px
-      rgba(255, 0, 170, 0.3);
+    0 0 20px rgba(255, 0, 170, 0.3);
 }
 
 .secondary-button {
   color: white;
-
   font-weight: 700;
-
-  border:
-    1px solid
-    #778099;
-
-  background:
-    rgba(8, 11, 21, 0.75);
+  border: 1px solid #778099;
+  background: rgba(8, 11, 21, 0.75);
 }
 
 .no-account {
-  margin:
-    13px 0
-    24px;
-
+  margin: 13px 0 24px;
   color: #8f96a9;
-
   font-size: 11px;
 }
 
 .install-button {
   margin-top: auto;
-
   border: none;
-
   color: #e7eaf5;
-
   background: transparent;
 }
 
 /* =========================
-   SHARED TOP BAR
+   SHARED
    ========================= */
 
 .top-bar {
   display: grid;
-
-  grid-template-columns:
-    40px
-    1fr
-    40px;
-
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
-
   margin-bottom: 28px;
 }
 
@@ -298,35 +230,22 @@ button {
 .more-button {
   width: 38px;
   height: 38px;
-
   display: grid;
   place-items: center;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.12);
-
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
 
   color: white;
-
-  background:
-    rgba(255, 255, 255, 0.04);
-}
-
-.more-button {
-  font-weight: 900;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .mini-brand {
   text-align: center;
-
   font-size: 20px;
   font-weight: 900;
   font-style: italic;
-
-  text-shadow:
-    0 0 12px #ff1cad;
+  text-shadow: 0 0 12px #ff1cad;
 }
 
 .mini-brand span {
@@ -337,24 +256,32 @@ button {
   width: 40px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: #ff40bc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
 /* =========================
-   VENUE SELECT SCREEN
+   VENUE SELECT
    ========================= */
 
-.venue-shell {
+.venue-shell,
+.venue-home-shell,
+.request-shell {
   padding: 0;
 }
 
-.venue-content {
+.venue-content,
+.venue-home-content,
+.request-page-content {
   position: relative;
   z-index: 2;
-
   min-height: 758px;
 
-  padding:
-    24px
-    20px
-    20px;
+  padding: 24px 20px 20px;
 
   display: flex;
   flex-direction: column;
@@ -364,97 +291,71 @@ button {
   margin-bottom: 22px;
 }
 
-.eyebrow {
-  margin:
-    0 0
-    8px;
-
-  color: #ff40bc;
-
-  font-size: 10px;
-  font-weight: 800;
-
-  letter-spacing: 2px;
-}
-
-.venue-heading h2 {
+.venue-heading h2,
+.request-page-heading h2 {
   margin: 0;
-
   font-size: 30px;
 }
 
-.venue-heading > p:last-child {
-  margin:
-    8px 0
-    0;
-
+.venue-heading > p:last-child,
+.request-page-heading > p:last-child {
+  margin: 8px 0 0;
   color: #9199ad;
-
   font-size: 13px;
 }
 
-.search-box {
+.search-box,
+.music-search {
   height: 48px;
 
   display: flex;
   align-items: center;
   gap: 10px;
 
-  padding:
-    0 14px;
+  padding: 0 14px;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.12);
-
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
 
   background: #0b101c;
 }
 
-.search-box span {
+.search-box span,
+.music-search > span {
   color: #9ba3b8;
-
   font-size: 22px;
 }
 
-.search-box input {
+.search-box input,
+.music-search input {
   width: 100%;
-
   border: none;
   outline: none;
-
   color: white;
-
   background: transparent;
-
   font-size: 13px;
 }
 
-.search-box input::placeholder {
+.search-box input::placeholder,
+.music-search input::placeholder {
   color: #6f778b;
 }
 
 .section-title {
-  margin:
-    25px 2px
-    12px;
+  margin: 25px 2px 12px;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
   color: #dce0ea;
-
   font-size: 12px;
   font-weight: 800;
 }
 
 .live-label {
   color: #ff35b5;
-
   font-size: 9px;
-
   letter-spacing: 1px;
 }
 
@@ -467,26 +368,16 @@ button {
   width: 100%;
 
   display: grid;
-
-  grid-template-columns:
-    58px
-    1fr
-    20px;
-
+  grid-template-columns: 58px 1fr 20px;
   align-items: center;
-
   gap: 12px;
 
   padding: 10px;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.1);
-
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
 
   color: white;
-
   text-align: left;
 
   background:
@@ -498,21 +389,17 @@ button {
 }
 
 .active-venue {
-  border-color:
-    rgba(255, 42, 184, 0.35);
+  border-color: rgba(255, 42, 184, 0.35);
 }
 
 .venue-image {
   width: 58px;
   height: 58px;
-
   display: grid;
   place-items: center;
-
   border-radius: 10px;
 
   color: white;
-
   font-size: 24px;
   font-weight: 900;
 
@@ -533,8 +420,7 @@ button {
     );
 
   box-shadow:
-    0 0 18px
-      rgba(255, 28, 172, 0.25);
+    0 0 18px rgba(255, 28, 172, 0.25);
 }
 
 .venue-info {
@@ -542,10 +428,7 @@ button {
 }
 
 .venue-info h3 {
-  margin:
-    0 0
-    4px;
-
+  margin: 0 0 4px;
   font-size: 14px;
 }
 
@@ -556,107 +439,65 @@ button {
 }
 
 .live-pill {
-  padding:
-    3px 6px;
-
+  padding: 3px 6px;
   border-radius: 5px;
 
   color: #ff56c6;
-
-  background:
-    rgba(255, 29, 173, 0.13);
+  background: rgba(255, 29, 173, 0.13);
 
   font-size: 8px;
   font-weight: 900;
 }
 
 .venue-info p {
-  margin:
-    0 0
-    3px;
-
+  margin: 0 0 3px;
   color: #5de1bd;
-
   font-size: 10px;
 }
 
 .venue-type {
   color: #6f778b;
-
   font-size: 9px;
 }
 
 .venue-arrow {
   color: #747c91;
-
   font-size: 24px;
 }
 
 /* =========================
-   VENUE HOME
+   TIPSYS HOME
    ========================= */
-
-.venue-home-shell {
-  padding: 0;
-}
-
-.venue-home-content {
-  position: relative;
-  z-index: 2;
-
-  min-height: 758px;
-
-  padding:
-    24px
-    20px
-    20px;
-
-  display: flex;
-  flex-direction: column;
-}
 
 .venue-live-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-
   margin-bottom: 18px;
 }
 
 .venue-live-header h2 {
   margin: 0;
-
   font-size: 32px;
 }
 
 .venue-subtext {
-  margin:
-    5px 0
-    0;
-
+  margin: 5px 0 0;
   color: #8f96a9;
-
   font-size: 12px;
 }
 
 .large-live-pill {
-  padding:
-    7px 10px;
+  padding: 7px 10px;
 
-  border:
-    1px solid
-    rgba(255, 43, 184, 0.45);
-
+  border: 1px solid rgba(255, 43, 184, 0.45);
   border-radius: 8px;
 
   color: #ff4bc2;
-
-  background:
-    rgba(255, 0, 170, 0.11);
+  background: rgba(255, 0, 170, 0.11);
 
   font-size: 10px;
   font-weight: 900;
-
   letter-spacing: 1px;
 }
 
@@ -666,10 +507,7 @@ button {
 
   padding: 16px;
 
-  border:
-    1px solid
-    rgba(255, 48, 184, 0.28);
-
+  border: 1px solid rgba(255, 48, 184, 0.28);
   border-radius: 18px;
 
   background:
@@ -681,8 +519,7 @@ button {
     );
 
   box-shadow:
-    0 0 25px
-      rgba(255, 0, 170, 0.08);
+    0 0 25px rgba(255, 0, 170, 0.08);
 }
 
 .album-art {
@@ -697,7 +534,6 @@ button {
   margin-bottom: 14px;
 
   border-radius: 14px;
-
   overflow: hidden;
 
   background:
@@ -712,67 +548,50 @@ button {
 .album-art span {
   position: relative;
   z-index: 2;
-
   font-size: 52px;
 }
 
 .album-glow {
   position: absolute;
-
   width: 130px;
   height: 130px;
 
   border-radius: 50%;
-
-  background:
-    rgba(255, 255, 255, 0.13);
-
+  background: rgba(255, 255, 255, 0.13);
   filter: blur(25px);
 }
 
 .now-playing-label {
   margin-bottom: 7px;
-
   color: #ff4bc2;
-
   font-size: 9px;
   font-weight: 900;
-
   letter-spacing: 1.6px;
 }
 
 .now-playing-card h3 {
   margin: 0;
-
   font-size: 22px;
 }
 
 .now-playing-card p {
-  margin:
-    5px 0
-    13px;
-
+  margin: 5px 0 13px;
   color: #9ba3b8;
-
   font-size: 12px;
 }
 
 .song-progress {
   width: 100%;
   height: 5px;
-
   overflow: hidden;
 
   border-radius: 20px;
-
-  background:
-    rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .song-progress-fill {
   width: 41%;
   height: 100%;
-
   border-radius: inherit;
 
   background:
@@ -786,17 +605,11 @@ button {
 .song-time {
   display: flex;
   justify-content: space-between;
-
   margin-top: 6px;
 
   color: #737c93;
-
   font-size: 9px;
 }
-
-/* =========================
-   CROWD
-   ========================= */
 
 .crowd-section {
   margin-top: 18px;
@@ -810,47 +623,34 @@ button {
 
 .section-heading-row h3 {
   margin: 0;
-
   font-size: 16px;
 }
 
 .crowd-score {
   color: #58e5bf;
-
   font-size: 18px;
   font-weight: 900;
 }
 
 .reaction-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(4, 1fr);
-
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-
   margin-top: 12px;
 }
 
 .reaction-button {
   display: grid;
   place-items: center;
-
   gap: 4px;
 
-  padding:
-    11px 5px;
+  padding: 11px 5px;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.09);
-
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
 
   color: white;
-
-  background:
-    rgba(12, 17, 29, 0.92);
+  background: rgba(12, 17, 29, 0.92);
 }
 
 .reaction-button span {
@@ -859,38 +659,24 @@ button {
 
 .reaction-button small {
   color: #8d95a8;
-
   font-size: 9px;
 }
-
-/* =========================
-   REQUEST BUTTON
-   ========================= */
 
 .request-song-button {
   width: 100%;
 
   display: grid;
-
-  grid-template-columns:
-    40px
-    1fr
-    20px;
-
+  grid-template-columns: 40px 1fr 20px;
   align-items: center;
-
   gap: 10px;
 
   margin-top: 18px;
-
   padding: 14px;
 
   border: none;
-
   border-radius: 14px;
 
   color: white;
-
   text-align: left;
 
   background:
@@ -901,8 +687,7 @@ button {
     );
 
   box-shadow:
-    0 0 24px
-      rgba(255, 0, 170, 0.22);
+    0 0 24px rgba(255, 0, 170, 0.22);
 }
 
 .request-icon {
@@ -913,9 +698,7 @@ button {
   place-items: center;
 
   border-radius: 50%;
-
-  background:
-    rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.15);
 
   font-size: 24px;
 }
@@ -930,9 +713,7 @@ button {
 }
 
 .request-button-text small {
-  color:
-    rgba(255, 255, 255, 0.78);
-
+  color: rgba(255, 255, 255, 0.78);
   font-size: 9px;
 }
 
@@ -940,54 +721,36 @@ button {
   font-size: 24px;
 }
 
-/* =========================
-   QUICK ACTIONS
-   ========================= */
-
 .quick-actions-section {
   margin-top: 18px;
 }
 
 .text-button {
   border: none;
-
   color: #ff49c4;
-
   background: transparent;
-
   font-size: 9px;
 }
 
 .quick-action-grid {
   display: grid;
-
-  grid-template-columns:
-    1fr
-    1fr;
-
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-
   margin-top: 10px;
 }
 
 .quick-action-card {
   display: flex;
   flex-direction: column;
-
   gap: 5px;
 
   min-height: 100px;
-
   padding: 13px;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.09);
-
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 14px;
 
   color: white;
-
   text-align: left;
 
   background:
@@ -1008,38 +771,578 @@ button {
 
 .quick-action-card small {
   color: #747d91;
-
   font-size: 8px;
 }
 
 /* =========================
-   FOOTER
+   REQUEST MUSIC
+   ========================= */
+
+.request-page-heading {
+  margin-bottom: 20px;
+}
+
+.music-search {
+  flex-shrink: 0;
+}
+
+.music-search button {
+  border: none;
+  color: #8f97aa;
+  background: transparent;
+  font-size: 22px;
+}
+
+.music-source-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.music-source-tabs button {
+  padding: 7px 13px;
+
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+
+  color: #838ba0;
+  background: #0a0e18;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.music-source-tabs .source-active {
+  border-color: rgba(255, 42, 184, 0.45);
+  color: white;
+  background: rgba(255, 28, 173, 0.16);
+}
+
+.song-results-header {
+  display: flex;
+  justify-content: space-between;
+
+  margin: 24px 2px 10px;
+
+  color: #70798e;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.song-results {
+  display: grid;
+  gap: 8px;
+}
+
+.song-result {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: 52px 1fr 32px;
+  align-items: center;
+  gap: 11px;
+
+  padding: 9px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 13px;
+
+  color: white;
+  text-align: left;
+
+  background: rgba(10, 14, 25, 0.94);
+}
+
+.song-result:hover {
+  border-color: rgba(255, 47, 183, 0.42);
+}
+
+.song-art {
+  width: 52px;
+  height: 52px;
+
+  display: grid;
+  place-items: center;
+
+  flex-shrink: 0;
+
+  border-radius: 10px;
+
+  color: white;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.song-art.pink {
+  background:
+    linear-gradient(
+      135deg,
+      #ff1ba8,
+      #7b23dd
+    );
+}
+
+.song-art.purple {
+  background:
+    linear-gradient(
+      135deg,
+      #652cff,
+      #c220ff
+    );
+}
+
+.song-art.blue {
+  background:
+    linear-gradient(
+      135deg,
+      #145dff,
+      #23c6ff
+    );
+}
+
+.song-art.cyan {
+  background:
+    linear-gradient(
+      135deg,
+      #00b6b6,
+      #245bff
+    );
+}
+
+.song-art.orange {
+  background:
+    linear-gradient(
+      135deg,
+      #ff6b24,
+      #ff166f
+    );
+}
+
+.song-art.green {
+  background:
+    linear-gradient(
+      135deg,
+      #16b779,
+      #195eff
+    );
+}
+
+.song-result-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-result-info strong {
+  overflow: hidden;
+  color: #f3f5fb;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-result-info span {
+  overflow: hidden;
+  margin-top: 3px;
+
+  color: #9ca4b8;
+  font-size: 9px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-result-info small {
+  margin-top: 3px;
+  color: #60697d;
+  font-size: 8px;
+}
+
+.add-song-button {
+  width: 29px;
+  height: 29px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  color: #ff4cc4;
+  background: rgba(255, 32, 179, 0.11);
+
+  font-size: 17px;
+}
+
+.no-results {
+  padding: 50px 20px;
+  text-align: center;
+}
+
+.no-results > span {
+  color: #555f74;
+  font-size: 42px;
+}
+
+.no-results h3 {
+  margin: 12px 0 5px;
+  font-size: 15px;
+}
+
+.no-results p {
+  margin: 0;
+  color: #747d91;
+  font-size: 10px;
+}
+
+/* =========================
+   REQUEST FORM
+   ========================= */
+
+.selected-song-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding: 13px;
+
+  border: 1px solid rgba(255, 47, 183, 0.3);
+  border-radius: 15px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 24, 172, 0.08),
+      rgba(67, 27, 118, 0.12)
+    );
+}
+
+.large-song-art {
+  width: 66px;
+  height: 66px;
+  font-size: 26px;
+}
+
+.selected-song-info {
+  min-width: 0;
+}
+
+.selected-song-info > span {
+  color: #ff45be;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+}
+
+.selected-song-info h3 {
+  margin: 5px 0 3px;
+  font-size: 17px;
+}
+
+.selected-song-info p {
+  margin: 0;
+  color: #929bad;
+  font-size: 10px;
+}
+
+.request-form {
+  display: grid;
+  margin-top: 22px;
+}
+
+.request-form > label:not(.save-song-row) {
+  display: flex;
+  justify-content: space-between;
+
+  margin: 0 2px 7px;
+
+  color: #d8dce7;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.request-form > label span {
+  color: #616a7e;
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+
+.request-form > input,
+.request-form textarea {
+  width: 100%;
+
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
+  outline: none;
+
+  color: white;
+  background: #0a0f1b;
+
+  font-size: 11px;
+}
+
+.request-form > input {
+  height: 45px;
+  padding: 0 13px;
+  margin-bottom: 18px;
+}
+
+.request-form textarea {
+  min-height: 90px;
+  padding: 13px;
+  resize: none;
+}
+
+.request-form > input:focus,
+.request-form textarea:focus {
+  border-color: rgba(255, 44, 184, 0.65);
+
+  box-shadow:
+    0 0 12px rgba(255, 20, 172, 0.08);
+}
+
+.character-count {
+  margin-top: 5px;
+  color: #596276;
+  text-align: right;
+  font-size: 8px;
+}
+
+.save-song-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-top: 16px;
+  padding: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.save-song-row input {
+  accent-color: #ff2eb7;
+}
+
+.save-song-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.save-song-row strong {
+  color: #e6e9f1;
+  font-size: 10px;
+}
+
+.save-song-row small {
+  color: #70798c;
+  font-size: 8px;
+}
+
+.request-warning {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  margin-top: 16px;
+  padding: 11px;
+
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.request-warning span {
+  color: #ff42bd;
+}
+
+.request-warning p {
+  margin: 0;
+  color: #788196;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.send-request-button {
+  width: 100%;
+
+  margin-top: auto;
+  padding: 15px;
+
+  border: none;
+  border-radius: 12px;
+
+  color: white;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  background:
+    linear-gradient(
+      90deg,
+      #ff1aa9,
+      #b420ff
+    );
+
+  box-shadow:
+    0 0 22px rgba(255, 0, 170, 0.2);
+}
+
+/* =========================
+   REQUEST SUCCESS
+   ========================= */
+
+.success-content {
+  position: relative;
+  z-index: 2;
+
+  min-height: 758px;
+  padding: 35px 24px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  text-align: center;
+}
+
+.success-content .mini-brand {
+  margin-bottom: auto;
+}
+
+.success-icon {
+  width: 84px;
+  height: 84px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 24px;
+
+  border: 1px solid rgba(87, 231, 188, 0.5);
+  border-radius: 50%;
+
+  color: #59e6bd;
+  background: rgba(63, 220, 177, 0.08);
+
+  font-size: 40px;
+
+  box-shadow:
+    0 0 30px rgba(68, 227, 185, 0.15);
+}
+
+.success-content h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.success-copy {
+  max-width: 270px;
+  margin: 9px 0 20px;
+
+  color: #8e97aa;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.submitted-song {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 11px;
+
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+
+  text-align: left;
+
+  background: #0a0e19;
+}
+
+.submitted-song > div:last-child {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.submitted-song strong {
+  font-size: 12px;
+}
+
+.submitted-song span {
+  color: #858ea2;
+  font-size: 9px;
+}
+
+.success-note {
+  display: flex;
+  gap: 9px;
+
+  margin: 15px 0 25px;
+  padding: 11px;
+
+  border-radius: 10px;
+
+  text-align: left;
+
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.success-note span {
+  color: #ff43bd;
+}
+
+.success-note p {
+  margin: 0;
+  color: #747d91;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.success-content .primary-button {
+  margin-top: auto;
+}
+
+.success-content .secondary-button {
+  margin-top: 10px;
+}
+
+/* =========================
+   BOTTOM NAV
    ========================= */
 
 .venue-footer {
   margin-top: auto;
-
   padding-top: 18px;
 
   display: flex;
   align-items: center;
   justify-content: space-around;
 
-  border-top:
-    1px solid
-    rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 
   color: #747c91;
+}
 
+.venue-footer button {
+  border: none;
+  color: #747c91;
+  background: transparent;
   font-size: 19px;
 }
 
-.footer-active {
+.venue-footer .footer-active {
   color: #ff31b5;
 
   text-shadow:
-    0 0 10px
-      rgba(255, 49, 181, 0.7);
+    0 0 10px rgba(255, 49, 181, 0.7);
 }
 
 /* =========================
@@ -1054,18 +1357,18 @@ button {
   .phone-shell {
     width: 100%;
     min-height: 100vh;
-
     border: none;
     border-radius: 0;
   }
 
   .welcome-content {
-    min-height:
-      calc(100vh - 66px);
+    min-height: calc(100vh - 66px);
   }
 
   .venue-content,
-  .venue-home-content {
+  .venue-home-content,
+  .request-page-content,
+  .success-content {
     min-height: 100vh;
   }
 }
