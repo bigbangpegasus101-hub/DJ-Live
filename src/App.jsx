@@ -139,6 +139,63 @@
               }, []);
 
 
+              useEffect(() => {
+                function handleRequestStatusUpdate(updatedRequest) {
+                  setRequests((currentRequests) =>
+                    currentRequests.map((request) =>
+                      request.id === updatedRequest.id
+                        ? updatedRequest
+                        : request
+                    )
+                  );
+                }
+
+                socket.on(
+                  "request-status-update",
+                  handleRequestStatusUpdate
+                );
+
+                return () => {
+                  socket.off(
+                    "request-status-update",
+                    handleRequestStatusUpdate
+                  );
+                };
+              }, []);
+
+
+              useEffect(() => {
+                function handleRequestsBatchUpdate(updatedRequests) {
+                  setRequests((currentRequests) => {
+                    const updatesById = new Map(
+                      updatedRequests.map((request) => [
+                        request.id,
+                        request,
+                      ])
+                    );
+
+                    return currentRequests.map((request) =>
+                      updatesById.has(request.id)
+                        ? updatesById.get(request.id)
+                        : request
+                    );
+                  });
+                }
+
+                socket.on(
+                  "requests-batch-update",
+                  handleRequestsBatchUpdate
+                );
+
+                return () => {
+                  socket.off(
+                    "requests-batch-update",
+                    handleRequestsBatchUpdate
+                  );
+                };
+              }, []);
+
+
               const filteredSongs = demoSongs.filter((song) => {
                 const query = search.trim().toLowerCase();
 
@@ -341,31 +398,65 @@
                           )
                         ) + 1;
 
-                  return currentRequests.map((request) =>
-                    request.id === requestId
-                      ? {
-                          ...request,
-                          status: "queued",
-                          queuePosition: nextQueuePosition,
-                        }
-                      : request
+                  let updatedRequest = null;
+
+                  const updatedRequests = currentRequests.map(
+                    (request) => {
+                      if (request.id !== requestId) {
+                        return request;
+                      }
+
+                      updatedRequest = {
+                        ...request,
+                        status: "queued",
+                        queuePosition: nextQueuePosition,
+                      };
+
+                      return updatedRequest;
+                    }
                   );
+
+                  if (updatedRequest) {
+                    socket.emit(
+                      "request-status-update",
+                      updatedRequest
+                    );
+                  }
+
+                  return updatedRequests;
                 });
               }
 
               function declineRequest(requestId) {
-                setRequests((currentRequests) =>
-                  currentRequests.map((request) =>
-                    request.id === requestId
-                      ? {
-                          ...request,
-                          status: "declined",
-                          queuePosition: null,
-                          deck: null,
-                        }
-                      : request
-                  )
-                );
+                setRequests((currentRequests) => {
+                  let updatedRequest = null;
+
+                  const updatedRequests = currentRequests.map(
+                    (request) => {
+                      if (request.id !== requestId) {
+                        return request;
+                      }
+
+                      updatedRequest = {
+                        ...request,
+                        status: "declined",
+                        queuePosition: null,
+                        deck: null,
+                      };
+
+                      return updatedRequest;
+                    }
+                  );
+
+                  if (updatedRequest) {
+                    socket.emit(
+                      "request-status-update",
+                      updatedRequest
+                    );
+                  }
+
+                  return updatedRequests;
+                });
               }
 
               function moveQueueItem(requestId, direction) {
@@ -401,8 +492,8 @@
                   const currentItem = queue[currentIndex];
                   const targetItem = queue[targetIndex];
 
-                  const updatedRequests = currentRequests.map(
-                    (request) => {
+                  const updatedRequests = normalizeQueue(
+                    currentRequests.map((request) => {
                       if (request.id === currentItem.id) {
                         return {
                           ...request,
@@ -418,17 +509,22 @@
                       }
 
                       return request;
-                    }
+                    })
                   );
 
-                  return normalizeQueue(updatedRequests);
+                  socket.emit(
+                    "requests-batch-update",
+                    updatedRequests
+                  );
+
+                  return updatedRequests;
                 });
               }
 
               function removeFromQueue(requestId) {
                 setRequests((currentRequests) => {
-                  const updatedRequests = currentRequests.map(
-                    (request) =>
+                  const updatedRequests = normalizeQueue(
+                    currentRequests.map((request) =>
                       request.id === requestId
                         ? {
                             ...request,
@@ -437,18 +533,25 @@
                             deck: null,
                           }
                         : request
+                    )
                   );
 
-                  return normalizeQueue(updatedRequests);
+                  socket.emit(
+                    "requests-batch-update",
+                    updatedRequests
+                  );
+
+                  return updatedRequests;
                 });
               }
 
               function loadToDeck(requestId, deckNumber) {
                 setRequests((currentRequests) => {
                   /*
-                    For V1, one requested track can occupy each deck.
-                    If another requested track is already marked loaded
-                    on this deck, return it to the front of the queue.
+                    Manual V1 test harness for the future Serato bridge.
+                    One requested track can occupy each deck.
+                    If another requested track is already loaded on this
+                    deck, return it to the front of the queue.
                   */
 
                   const targetRequest = currentRequests.find(
@@ -471,8 +574,8 @@
                         (b.queuePosition ?? 9999)
                     );
 
-                  let updatedRequests = currentRequests.map(
-                    (request) => {
+                  const updatedRequests = normalizeQueue(
+                    currentRequests.map((request) => {
                       if (
                         request.status === "loaded" &&
                         request.deck === deckNumber &&
@@ -512,17 +615,22 @@
                       }
 
                       return request;
-                    }
+                    })
                   );
 
-                  return normalizeQueue(updatedRequests);
+                  socket.emit(
+                    "requests-batch-update",
+                    updatedRequests
+                  );
+
+                  return updatedRequests;
                 });
               }
 
               function returnLoadedToQueue(requestId) {
                 setRequests((currentRequests) => {
-                  const updatedRequests = currentRequests.map(
-                    (request) => {
+                  const updatedRequests = normalizeQueue(
+                    currentRequests.map((request) => {
                       if (request.id === requestId) {
                         return {
                           ...request,
@@ -542,26 +650,39 @@
                       }
 
                       return request;
-                    }
+                    })
                   );
 
-                  return normalizeQueue(updatedRequests);
+                  socket.emit(
+                    "requests-batch-update",
+                    updatedRequests
+                  );
+
+                  return updatedRequests;
                 });
               }
 
               function markPlayed(requestId) {
-                setRequests((currentRequests) =>
-                  currentRequests.map((request) =>
-                    request.id === requestId
-                      ? {
-                          ...request,
-                          status: "played",
-                          queuePosition: null,
-                          playedAt: new Date().toISOString(),
-                        }
-                      : request
-                  )
-                );
+                setRequests((currentRequests) => {
+                  const updatedRequests = currentRequests.map(
+                    (request) =>
+                      request.id === requestId
+                        ? {
+                            ...request,
+                            status: "played",
+                            queuePosition: null,
+                            playedAt: new Date().toISOString(),
+                          }
+                        : request
+                  );
+
+                  socket.emit(
+                    "requests-batch-update",
+                    updatedRequests
+                  );
+
+                  return updatedRequests;
+                });
               }
 
               function formatRequestTime(timestamp) {

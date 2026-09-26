@@ -39,6 +39,23 @@ io.on("connection", (socket) => {
     io.emit("song-request", request);
   });
 
+  socket.on("request-status-update", (request) => {
+    console.log("");
+    console.log("REQUEST STATUS UPDATE");
+    console.log(`Song: ${request.song?.title}`);
+    console.log(`Status: ${request.status}`);
+
+    io.emit("request-status-update", request);
+  });
+
+  socket.on("requests-batch-update", (requests) => {
+    console.log("");
+    console.log("REQUESTS BATCH UPDATE");
+    console.log(`Requests synced: ${requests.length}`);
+
+    io.emit("requests-batch-update", requests);
+  });
+
   socket.on("disconnect", () => {
     console.log(`DJ Live client disconnected: ${socket.id}`);
   });
