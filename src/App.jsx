@@ -53,8 +53,7 @@ function App() {
   const [requestName, setRequestName] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
 
-  const [selectedReaction, setSelectedReaction] =
-    useState(null);
+  const [selectedReaction, setSelectedReaction] = useState(null);
 
   const [crowdVotes, setCrowdVotes] = useState({
     fire: 38,
@@ -84,8 +83,7 @@ function App() {
     totalVotes === 0
       ? 0
       : Math.round(
-          ((crowdVotes.fire + crowdVotes.good) /
-            totalVotes) *
+          ((crowdVotes.fire + crowdVotes.good) / totalVotes) *
             100
         );
 
@@ -101,6 +99,18 @@ function App() {
       (a, b) =>
         (a.queuePosition ?? 9999) -
         (b.queuePosition ?? 9999)
+    );
+
+  const loadedRequests = requests.filter(
+    (request) => request.status === "loaded"
+  );
+
+  const playedRequests = requests
+    .filter((request) => request.status === "played")
+    .sort(
+      (a, b) =>
+        new Date(b.playedAt || 0) -
+        new Date(a.playedAt || 0)
     );
 
   const declinedRequests = requests.filter(
@@ -132,9 +142,7 @@ function App() {
   }
 
   function submitRequest() {
-    if (!selectedSong) {
-      return;
-    }
+    if (!selectedSong) return;
 
     const newRequest = {
       id: Date.now() + Math.random(),
@@ -144,6 +152,9 @@ function App() {
       submittedAt: new Date().toISOString(),
       status: "pending",
       queuePosition: null,
+      deck: null,
+      loadedAt: null,
+      playedAt: null,
     };
 
     setRequests((currentRequests) => [
@@ -171,14 +182,10 @@ function App() {
   }
 
   function handleReaction(reaction) {
-    if (selectedReaction === reaction) {
-      return;
-    }
+    if (selectedReaction === reaction) return;
 
     setCrowdVotes((currentVotes) => {
-      const updatedVotes = {
-        ...currentVotes,
-      };
+      const updatedVotes = { ...currentVotes };
 
       if (selectedReaction) {
         updatedVotes[selectedReaction] = Math.max(
@@ -187,8 +194,7 @@ function App() {
         );
       }
 
-      updatedVotes[reaction] =
-        updatedVotes[reaction] + 1;
+      updatedVotes[reaction] += 1;
 
       return updatedVotes;
     });
@@ -197,16 +203,13 @@ function App() {
   }
 
   function reactionStyle(reaction) {
-    if (selectedReaction !== reaction) {
-      return {};
-    }
+    if (selectedReaction !== reaction) return {};
 
     return {
       borderColor: "rgba(255, 49, 181, 0.9)",
       background:
         "linear-gradient(145deg, rgba(255, 28, 172, 0.20), rgba(80, 34, 180, 0.18))",
-      boxShadow:
-        "0 0 18px rgba(255, 49, 181, 0.20)",
+      boxShadow: "0 0 18px rgba(255, 49, 181, 0.20)",
       transform: "translateY(-2px)",
     };
   }
@@ -217,6 +220,33 @@ function App() {
     if (index === 2) return "🥉";
 
     return `#${index + 1}`;
+  }
+
+  function normalizeQueue(requestList) {
+    const queued = requestList
+      .filter((request) => request.status === "queued")
+      .sort(
+        (a, b) =>
+          (a.queuePosition ?? 9999) -
+          (b.queuePosition ?? 9999)
+      );
+
+    const queuePositions = new Map();
+
+    queued.forEach((request, index) => {
+      queuePositions.set(request.id, index + 1);
+    });
+
+    return requestList.map((request) => {
+      if (!queuePositions.has(request.id)) {
+        return request;
+      }
+
+      return {
+        ...request,
+        queuePosition: queuePositions.get(request.id),
+      };
+    });
   }
 
   function approveRequest(requestId) {
@@ -254,37 +284,11 @@ function App() {
               ...request,
               status: "declined",
               queuePosition: null,
+              deck: null,
             }
           : request
       )
     );
-  }
-
-  function normalizeQueue(requestList) {
-    const queued = requestList
-      .filter((request) => request.status === "queued")
-      .sort(
-        (a, b) =>
-          (a.queuePosition ?? 9999) -
-          (b.queuePosition ?? 9999)
-      );
-
-    const queuePositions = new Map();
-
-    queued.forEach((request, index) => {
-      queuePositions.set(request.id, index + 1);
-    });
-
-    return requestList.map((request) => {
-      if (!queuePositions.has(request.id)) {
-        return request;
-      }
-
-      return {
-        ...request,
-        queuePosition: queuePositions.get(request.id),
-      };
-    });
   }
 
   function moveQueueItem(requestId, direction) {
@@ -325,16 +329,14 @@ function App() {
           if (request.id === currentItem.id) {
             return {
               ...request,
-              queuePosition:
-                targetItem.queuePosition,
+              queuePosition: targetItem.queuePosition,
             };
           }
 
           if (request.id === targetItem.id) {
             return {
               ...request,
-              queuePosition:
-                currentItem.queuePosition,
+              queuePosition: currentItem.queuePosition,
             };
           }
 
@@ -355,6 +357,7 @@ function App() {
                 ...request,
                 status: "declined",
                 queuePosition: null,
+                deck: null,
               }
             : request
       );
@@ -363,10 +366,131 @@ function App() {
     });
   }
 
-  function formatRequestTime(timestamp) {
-    const date = new Date(timestamp);
+  function loadToDeck(requestId, deckNumber) {
+    setRequests((currentRequests) => {
+      /*
+        For V1, one requested track can occupy each deck.
+        If another requested track is already marked loaded
+        on this deck, return it to the front of the queue.
+      */
 
-    return date.toLocaleTimeString([], {
+      const targetRequest = currentRequests.find(
+        (request) => request.id === requestId
+      );
+
+      if (!targetRequest) {
+        return currentRequests;
+      }
+
+      const currentQueue = currentRequests
+        .filter(
+          (request) =>
+            request.status === "queued" &&
+            request.id !== requestId
+        )
+        .sort(
+          (a, b) =>
+            (a.queuePosition ?? 9999) -
+            (b.queuePosition ?? 9999)
+        );
+
+      let updatedRequests = currentRequests.map(
+        (request) => {
+          if (
+            request.status === "loaded" &&
+            request.deck === deckNumber &&
+            request.id !== requestId
+          ) {
+            return {
+              ...request,
+              status: "queued",
+              queuePosition: 1,
+              deck: null,
+              loadedAt: null,
+            };
+          }
+
+          if (request.id === requestId) {
+            return {
+              ...request,
+              status: "loaded",
+              queuePosition: null,
+              deck: deckNumber,
+              loadedAt: new Date().toISOString(),
+            };
+          }
+
+          if (
+            request.status === "queued" &&
+            currentQueue.some(
+              (queuedRequest) =>
+                queuedRequest.id === request.id
+            )
+          ) {
+            return {
+              ...request,
+              queuePosition:
+                (request.queuePosition ?? 0) + 1,
+            };
+          }
+
+          return request;
+        }
+      );
+
+      return normalizeQueue(updatedRequests);
+    });
+  }
+
+  function returnLoadedToQueue(requestId) {
+    setRequests((currentRequests) => {
+      const updatedRequests = currentRequests.map(
+        (request) => {
+          if (request.id === requestId) {
+            return {
+              ...request,
+              status: "queued",
+              queuePosition: 1,
+              deck: null,
+              loadedAt: null,
+            };
+          }
+
+          if (request.status === "queued") {
+            return {
+              ...request,
+              queuePosition:
+                (request.queuePosition ?? 0) + 1,
+            };
+          }
+
+          return request;
+        }
+      );
+
+      return normalizeQueue(updatedRequests);
+    });
+  }
+
+  function markPlayed(requestId) {
+    setRequests((currentRequests) =>
+      currentRequests.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              status: "played",
+              queuePosition: null,
+              playedAt: new Date().toISOString(),
+            }
+          : request
+      )
+    );
+  }
+
+  function formatRequestTime(timestamp) {
+    if (!timestamp) return "";
+
+    return new Date(timestamp).toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
     });
@@ -382,19 +506,17 @@ function App() {
     return (
       <main
         className="app"
-        style={{
-          alignItems: "flex-start",
-        }}
+        style={{ alignItems: "flex-start" }}
       >
         <section
           style={{
             position: "relative",
             overflow: "hidden",
-            width: "min(1180px, 100%)",
+            width: "min(1220px, 100%)",
             minHeight: "760px",
             padding: "24px",
             border:
-              "1px solid rgba(255, 42, 184, 0.40)",
+              "1px solid rgba(255,42,184,0.40)",
             borderRadius: "24px",
             background:
               "linear-gradient(180deg, rgba(15,8,28,0.98), rgba(3,7,16,0.98))",
@@ -424,9 +546,7 @@ function App() {
               <div>
                 <div
                   className="mini-brand"
-                  style={{
-                    textAlign: "left",
-                  }}
+                  style={{ textAlign: "left" }}
                 >
                   DJ LIVE <span>♕</span>
                 </div>
@@ -445,8 +565,8 @@ function App() {
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
                   gap: "10px",
+                  alignItems: "center",
                 }}
               >
                 <span className="large-live-pill">
@@ -472,7 +592,7 @@ function App() {
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fit, minmax(150px, 1fr))",
+                  "repeat(auto-fit, minmax(130px,1fr))",
                 gap: "10px",
                 marginBottom: "24px",
               }}
@@ -485,64 +605,211 @@ function App() {
 
               <DashboardStat
                 number={queuedRequests.length}
-                label="IN QUEUE"
+                label="QUEUED"
                 color="#58e5bf"
               />
 
               <DashboardStat
-                number={declinedRequests.length}
-                label="DECLINED"
-                color="#ff657d"
+                number={loadedRequests.length}
+                label="LOADED"
+                color="#6cb8ff"
+              />
+
+              <DashboardStat
+                number={playedRequests.length}
+                label="PLAYED"
+                color="#b68cff"
               />
 
               <DashboardStat
                 number={totalRequests}
-                label="TOTAL TONIGHT"
+                label="TOTAL"
                 color="#dce0ea"
               />
             </div>
+
+            {loadedRequests.length > 0 && (
+              <section
+                style={{
+                  marginBottom: "24px",
+                }}
+              >
+                <p className="eyebrow">
+                  SERATO DECK STATE · MANUAL V1
+                </p>
+
+                <h2
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: "22px",
+                  }}
+                >
+                  Loaded Tracks
+                </h2>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(260px,1fr))",
+                    gap: "10px",
+                  }}
+                >
+                  {loadedRequests
+                    .sort(
+                      (a, b) =>
+                        (a.deck ?? 99) -
+                        (b.deck ?? 99)
+                    )
+                    .map((request) => (
+                      <div
+                        key={request.id}
+                        style={{
+                          padding: "14px",
+                          border:
+                            "1px solid rgba(108,184,255,0.35)",
+                          borderRadius: "15px",
+                          background:
+                            "linear-gradient(90deg, rgba(40,110,255,0.10), rgba(10,14,25,0.94))",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent:
+                              "space-between",
+                            gap: "12px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "11px",
+                              minWidth: 0,
+                            }}
+                          >
+                            <div
+                              className={`song-art ${request.song.color}`}
+                              style={{
+                                width: "52px",
+                                height: "52px",
+                              }}
+                            >
+                              ♫
+                            </div>
+
+                            <div
+                              style={{
+                                minWidth: 0,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: "#6cb8ff",
+                                  fontSize: "8px",
+                                  fontWeight: 900,
+                                  letterSpacing: "1px",
+                                }}
+                              >
+                                LOADED · DECK{" "}
+                                {request.deck}
+                              </span>
+
+                              <strong
+                                style={{
+                                  display: "block",
+                                  marginTop: "4px",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                {request.song.title}
+                              </strong>
+
+                              <span
+                                style={{
+                                  display: "block",
+                                  marginTop: "3px",
+                                  color: "#8992a6",
+                                  fontSize: "8px",
+                                }}
+                              >
+                                {request.song.artist}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "1fr 1fr",
+                            gap: "7px",
+                            marginTop: "12px",
+                          }}
+                        >
+                          <button
+                            onClick={() =>
+                              markPlayed(request.id)
+                            }
+                            style={{
+                              padding: "9px",
+                              border:
+                                "1px solid rgba(88,229,191,0.30)",
+                              borderRadius: "8px",
+                              color: "#58e5bf",
+                              background:
+                                "rgba(88,229,191,0.07)",
+                              fontSize: "8px",
+                              fontWeight: 900,
+                            }}
+                          >
+                            ✓ MARK PLAYED
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              returnLoadedToQueue(
+                                request.id
+                              )
+                            }
+                            style={{
+                              padding: "9px",
+                              border:
+                                "1px solid rgba(255,255,255,0.10)",
+                              borderRadius: "8px",
+                              color: "#aeb6c8",
+                              background:
+                                "rgba(255,255,255,0.03)",
+                              fontSize: "8px",
+                              fontWeight: 900,
+                            }}
+                          >
+                            ↩ RETURN TO QUEUE
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            )}
 
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "minmax(0, 1fr) minmax(0, 1fr)",
+                  "repeat(auto-fit, minmax(330px,1fr))",
                 gap: "18px",
               }}
             >
               <section>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <div>
-                    <p className="eyebrow">
-                      LIVE REQUESTS
-                    </p>
-
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontSize: "22px",
-                      }}
-                    >
-                      Incoming Requests
-                    </h2>
-                  </div>
-
-                  <span
-                    style={{
-                      color: "#747d91",
-                      fontSize: "9px",
-                    }}
-                  >
-                    {pendingRequests.length} waiting
-                  </span>
-                </div>
+                <DashboardHeading
+                  eyebrow="LIVE REQUESTS"
+                  title="Incoming Requests"
+                  side={`${pendingRequests.length} waiting`}
+                />
 
                 {pendingRequests.length === 0 ? (
                   <EmptyDashboardCard
@@ -561,226 +828,31 @@ function App() {
                       .slice()
                       .reverse()
                       .map((request) => (
-                        <div
+                        <IncomingRequestCard
                           key={request.id}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "58px minmax(0,1fr)",
-                            gap: "12px",
-                            padding: "13px",
-                            border:
-                              "1px solid rgba(255,47,183,0.20)",
-                            borderRadius: "15px",
-                            background:
-                              "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))",
-                          }}
-                        >
-                          <div
-                            className={`song-art ${request.song.color}`}
-                            style={{
-                              width: "58px",
-                              height: "58px",
-                            }}
-                          >
-                            ♫
-                          </div>
-
-                          <div
-                            style={{
-                              minWidth: 0,
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent:
-                                  "space-between",
-                                gap: "10px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  minWidth: 0,
-                                }}
-                              >
-                                <strong
-                                  style={{
-                                    display: "block",
-                                    overflow: "hidden",
-                                    textOverflow:
-                                      "ellipsis",
-                                    whiteSpace: "nowrap",
-                                    fontSize: "13px",
-                                  }}
-                                >
-                                  {request.song.title}
-                                </strong>
-
-                                <span
-                                  style={{
-                                    display: "block",
-                                    marginTop: "3px",
-                                    color: "#8992a6",
-                                    fontSize: "9px",
-                                  }}
-                                >
-                                  {request.song.artist}
-                                </span>
-                              </div>
-
-                              <span
-                                style={{
-                                  color: "#626c80",
-                                  fontSize: "8px",
-                                }}
-                              >
-                                {formatRequestTime(
-                                  request.submittedAt
-                                )}
-                              </span>
-                            </div>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "7px",
-                                marginTop: "9px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  color: "#ff47bf",
-                                  fontSize: "9px",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                {request.name}
-                              </span>
-
-                              <span
-                                style={{
-                                  color: "#3d4557",
-                                }}
-                              >
-                                •
-                              </span>
-
-                              <span
-                                style={{
-                                  color: "#6e778c",
-                                  fontSize: "8px",
-                                }}
-                              >
-                                Guest Request
-                              </span>
-                            </div>
-
-                            {request.message && (
-                              <div
-                                style={{
-                                  marginTop: "8px",
-                                  padding: "8px 10px",
-                                  borderRadius: "9px",
-                                  color: "#aab1c1",
-                                  background:
-                                    "rgba(255,255,255,0.035)",
-                                  fontSize: "9px",
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                “{request.message}”
-                              </div>
-                            )}
-
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "1fr 1fr",
-                                gap: "8px",
-                                marginTop: "11px",
-                              }}
-                            >
-                              <button
-                                onClick={() =>
-                                  approveRequest(request.id)
-                                }
-                                style={{
-                                  padding: "9px",
-                                  border:
-                                    "1px solid rgba(88,229,191,0.35)",
-                                  borderRadius: "9px",
-                                  color: "#58e5bf",
-                                  background:
-                                    "rgba(88,229,191,0.08)",
-                                  fontSize: "9px",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                ✓ APPROVE + QUEUE
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  declineRequest(request.id)
-                                }
-                                style={{
-                                  padding: "9px",
-                                  border:
-                                    "1px solid rgba(255,101,125,0.30)",
-                                  borderRadius: "9px",
-                                  color: "#ff657d",
-                                  background:
-                                    "rgba(255,101,125,0.07)",
-                                  fontSize: "9px",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                × DECLINE
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                          request={request}
+                          onApprove={() =>
+                            approveRequest(request.id)
+                          }
+                          onDecline={() =>
+                            declineRequest(request.id)
+                          }
+                          formatRequestTime={
+                            formatRequestTime
+                          }
+                        />
                       ))}
                   </div>
                 )}
               </section>
 
               <section>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <div>
-                    <p className="eyebrow">
-                      APPROVED
-                    </p>
-
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontSize: "22px",
-                      }}
-                    >
-                      DJ Queue
-                    </h2>
-                  </div>
-
-                  <span
-                    style={{
-                      color: "#58e5bf",
-                      fontSize: "9px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {queuedRequests.length} queued
-                  </span>
-                </div>
+                <DashboardHeading
+                  eyebrow="APPROVED"
+                  title="DJ Queue"
+                  side={`${queuedRequests.length} queued`}
+                  sideColor="#58e5bf"
+                />
 
                 {queuedRequests.length === 0 ? (
                   <EmptyDashboardCard
@@ -800,11 +872,6 @@ function App() {
                         <div
                           key={request.id}
                           style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "36px 48px minmax(0,1fr)",
-                            gap: "10px",
-                            alignItems: "center",
                             padding: "11px",
                             border:
                               index === 0
@@ -819,194 +886,179 @@ function App() {
                         >
                           <div
                             style={{
-                              width: "30px",
-                              height: "30px",
                               display: "grid",
-                              placeItems: "center",
-                              borderRadius: "50%",
-                              color:
-                                index === 0
-                                  ? "#58e5bf"
-                                  : "#8992a6",
-                              background:
-                                "rgba(255,255,255,0.05)",
-                              fontSize: "10px",
-                              fontWeight: 900,
-                            }}
-                          >
-                            {index + 1}
-                          </div>
-
-                          <div
-                            className={`song-art ${request.song.color}`}
-                            style={{
-                              width: "48px",
-                              height: "48px",
-                              fontSize: "18px",
-                            }}
-                          >
-                            ♫
-                          </div>
-
-                          <div
-                            style={{
-                              minWidth: 0,
+                              gridTemplateColumns:
+                                "34px 48px minmax(0,1fr)",
+                              gap: "10px",
+                              alignItems: "center",
                             }}
                           >
                             <div
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent:
-                                  "space-between",
-                                gap: "8px",
+                                width: "30px",
+                                height: "30px",
+                                display: "grid",
+                                placeItems: "center",
+                                borderRadius: "50%",
+                                color:
+                                  index === 0
+                                    ? "#58e5bf"
+                                    : "#8992a6",
+                                background:
+                                  "rgba(255,255,255,0.05)",
+                                fontSize: "10px",
+                                fontWeight: 900,
+                              }}
+                            >
+                              {index + 1}
+                            </div>
+
+                            <div
+                              className={`song-art ${request.song.color}`}
+                              style={{
+                                width: "48px",
+                                height: "48px",
+                                fontSize: "18px",
+                              }}
+                            >
+                              ♫
+                            </div>
+
+                            <div
+                              style={{
+                                minWidth: 0,
                               }}
                             >
                               <div
                                 style={{
-                                  minWidth: 0,
+                                  display: "flex",
+                                  justifyContent:
+                                    "space-between",
+                                  gap: "8px",
                                 }}
                               >
-                                <strong
+                                <div
                                   style={{
-                                    display: "block",
-                                    overflow: "hidden",
-                                    textOverflow:
-                                      "ellipsis",
-                                    whiteSpace: "nowrap",
-                                    fontSize: "11px",
+                                    minWidth: 0,
                                   }}
                                 >
-                                  {request.song.title}
-                                </strong>
+                                  <strong
+                                    style={{
+                                      display: "block",
+                                      fontSize: "11px",
+                                    }}
+                                  >
+                                    {request.song.title}
+                                  </strong>
 
-                                <span
-                                  style={{
-                                    display: "block",
-                                    marginTop: "3px",
-                                    color: "#7f899d",
-                                    fontSize: "8px",
-                                  }}
-                                >
-                                  {request.song.artist}
-                                </span>
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      marginTop: "3px",
+                                      color: "#7f899d",
+                                      fontSize: "8px",
+                                    }}
+                                  >
+                                    {request.song.artist}
+                                  </span>
+                                </div>
+
+                                {index === 0 && (
+                                  <span
+                                    style={{
+                                      color: "#58e5bf",
+                                      fontSize: "7px",
+                                      fontWeight: 900,
+                                    }}
+                                  >
+                                    NEXT
+                                  </span>
+                                )}
                               </div>
 
-                              {index === 0 && (
-                                <span
-                                  style={{
-                                    flexShrink: 0,
-                                    padding: "4px 6px",
-                                    borderRadius: "6px",
-                                    color: "#58e5bf",
-                                    background:
-                                      "rgba(88,229,191,0.08)",
-                                    fontSize: "7px",
-                                    fontWeight: 900,
-                                  }}
-                                >
-                                  NEXT
-                                </span>
-                              )}
-                            </div>
-
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                color: "#687185",
-                                fontSize: "8px",
-                              }}
-                            >
-                              Requested by {request.name}
-                            </div>
-
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "36px 36px 1fr",
-                                gap: "6px",
-                                marginTop: "9px",
-                              }}
-                            >
-                              <button
-                                onClick={() =>
-                                  moveQueueItem(
-                                    request.id,
-                                    "up"
-                                  )
-                                }
-                                disabled={index === 0}
+                              <div
                                 style={{
-                                  height: "30px",
-                                  border:
-                                    "1px solid rgba(255,255,255,0.10)",
-                                  borderRadius: "8px",
-                                  color:
-                                    index === 0
-                                      ? "#41495a"
-                                      : "#dce0ea",
-                                  background:
-                                    "rgba(255,255,255,0.035)",
-                                  opacity:
-                                    index === 0 ? 0.5 : 1,
-                                }}
-                              >
-                                ↑
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  moveQueueItem(
-                                    request.id,
-                                    "down"
-                                  )
-                                }
-                                disabled={
-                                  index ===
-                                  queuedRequests.length - 1
-                                }
-                                style={{
-                                  height: "30px",
-                                  border:
-                                    "1px solid rgba(255,255,255,0.10)",
-                                  borderRadius: "8px",
-                                  color:
-                                    index ===
-                                    queuedRequests.length - 1
-                                      ? "#41495a"
-                                      : "#dce0ea",
-                                  background:
-                                    "rgba(255,255,255,0.035)",
-                                  opacity:
-                                    index ===
-                                    queuedRequests.length - 1
-                                      ? 0.5
-                                      : 1,
-                                }}
-                              >
-                                ↓
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  removeFromQueue(request.id)
-                                }
-                                style={{
-                                  height: "30px",
-                                  border:
-                                    "1px solid rgba(255,101,125,0.20)",
-                                  borderRadius: "8px",
-                                  color: "#ff657d",
-                                  background:
-                                    "rgba(255,101,125,0.05)",
+                                  marginTop: "7px",
+                                  color: "#687185",
                                   fontSize: "8px",
-                                  fontWeight: 800,
                                 }}
                               >
-                                REMOVE
-                              </button>
+                                Requested by{" "}
+                                {request.name}
+                              </div>
                             </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "36px 36px 1fr 1fr 1fr",
+                              gap: "6px",
+                              marginTop: "10px",
+                            }}
+                          >
+                            <QueueButton
+                              disabled={index === 0}
+                              onClick={() =>
+                                moveQueueItem(
+                                  request.id,
+                                  "up"
+                                )
+                              }
+                            >
+                              ↑
+                            </QueueButton>
+
+                            <QueueButton
+                              disabled={
+                                index ===
+                                queuedRequests.length - 1
+                              }
+                              onClick={() =>
+                                moveQueueItem(
+                                  request.id,
+                                  "down"
+                                )
+                              }
+                            >
+                              ↓
+                            </QueueButton>
+
+                            <QueueButton
+                              blue
+                              onClick={() =>
+                                loadToDeck(
+                                  request.id,
+                                  1
+                                )
+                              }
+                            >
+                              DECK 1
+                            </QueueButton>
+
+                            <QueueButton
+                              blue
+                              onClick={() =>
+                                loadToDeck(
+                                  request.id,
+                                  2
+                                )
+                              }
+                            >
+                              DECK 2
+                            </QueueButton>
+
+                            <QueueButton
+                              danger
+                              onClick={() =>
+                                removeFromQueue(
+                                  request.id
+                                )
+                              }
+                            >
+                              REMOVE
+                            </QueueButton>
                           </div>
                         </div>
                       )
@@ -1018,66 +1070,110 @@ function App() {
 
             <section
               style={{
-                marginTop: "22px",
+                marginTop: "24px",
               }}
             >
-              <p className="eyebrow">
-                RECENT ACTIVITY
-              </p>
+              <DashboardHeading
+                eyebrow="SESSION HISTORY"
+                title="Played Requests"
+                side={`${playedRequests.length} played`}
+                sideColor="#b68cff"
+              />
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: "8px",
-                }}
-              >
-                {requests
-                  .filter(
-                    (request) =>
-                      request.status !== "pending"
-                  )
-                  .slice()
-                  .reverse()
-                  .map((request) => (
+              {playedRequests.length === 0 ? (
+                <div
+                  style={{
+                    padding: "18px",
+                    border:
+                      "1px solid rgba(255,255,255,0.07)",
+                    borderRadius: "13px",
+                    color: "#747d91",
+                    background:
+                      "rgba(10,14,25,0.70)",
+                    textAlign: "center",
+                    fontSize: "9px",
+                  }}
+                >
+                  Played requests will appear here.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(220px,1fr))",
+                    gap: "8px",
+                  }}
+                >
+                  {playedRequests.map((request) => (
                     <div
                       key={request.id}
                       style={{
-                        padding: "10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "11px",
                         border:
-                          "1px solid rgba(255,255,255,0.07)",
-                        borderRadius: "11px",
+                          "1px solid rgba(182,140,255,0.18)",
+                        borderRadius: "12px",
                         background:
-                          "rgba(10,14,25,0.80)",
+                          "rgba(10,14,25,0.85)",
                       }}
                     >
-                      <strong
+                      <div
+                        className={`song-art ${request.song.color}`}
                         style={{
-                          fontSize: "9px",
+                          width: "42px",
+                          height: "42px",
+                          fontSize: "16px",
                         }}
                       >
-                        {request.song.title}
-                      </strong>
+                        ♫
+                      </div>
 
-                      <span
+                      <div
                         style={{
-                          display: "block",
-                          marginTop: "4px",
-                          color:
-                            request.status === "queued"
-                              ? "#58e5bf"
-                              : "#ff657d",
-                          fontSize: "7px",
-                          fontWeight: 900,
-                          textTransform: "uppercase",
+                          minWidth: 0,
                         }}
                       >
-                        {request.status}
-                      </span>
+                        <strong
+                          style={{
+                            display: "block",
+                            fontSize: "10px",
+                          }}
+                        >
+                          {request.song.title}
+                        </strong>
+
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: "3px",
+                            color: "#b68cff",
+                            fontSize: "7px",
+                            fontWeight: 900,
+                          }}
+                        >
+                          PLAYED · DECK {request.deck}
+                        </span>
+
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: "3px",
+                            color: "#687185",
+                            fontSize: "7px",
+                          }}
+                        >
+                          {formatRequestTime(
+                            request.playedAt
+                          )}
+                        </span>
+                      </div>
                     </div>
                   ))}
-              </div>
+                </div>
+              )}
             </section>
           </div>
         </section>
@@ -1102,7 +1198,9 @@ function App() {
             <div className="top-bar">
               <button
                 className="back-button"
-                onClick={() => setScreen("venueHome")}
+                onClick={() =>
+                  setScreen("venueHome")
+                }
               >
                 ←
               </button>
@@ -1114,7 +1212,11 @@ function App() {
               <div className="top-spacer"></div>
             </div>
 
-            <div style={{ marginBottom: "22px" }}>
+            <div
+              style={{
+                marginBottom: "22px",
+              }}
+            >
               <p className="eyebrow">
                 TIPSYS · TONIGHT
               </p>
@@ -1189,7 +1291,8 @@ function App() {
                       item.count > 0
                         ? "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))"
                         : "rgba(10,14,25,0.90)",
-                    opacity: item.count > 0 ? 1 : 0.55,
+                    opacity:
+                      item.count > 0 ? 1 : 0.55,
                   }}
                 >
                   <div
@@ -1269,9 +1372,7 @@ function App() {
 
             <button
               className="request-song-button"
-              style={{
-                marginTop: "20px",
-              }}
+              style={{ marginTop: "20px" }}
               onClick={() =>
                 setScreen("requestMusic")
               }
@@ -1290,12 +1391,16 @@ function App() {
                 </small>
               </div>
 
-              <span className="request-arrow">›</span>
+              <span className="request-arrow">
+                ›
+              </span>
             </button>
 
             <div className="venue-footer">
               <button
-                onClick={() => setScreen("venueHome")}
+                onClick={() =>
+                  setScreen("venueHome")
+                }
               >
                 ⌂
               </button>
@@ -1338,7 +1443,9 @@ function App() {
               DJ LIVE <span>♕</span>
             </div>
 
-            <div className="success-icon">✓</div>
+            <div className="success-icon">
+              ✓
+            </div>
 
             <p className="eyebrow">
               REQUEST SENT
@@ -1347,7 +1454,8 @@ function App() {
             <h2>You're in the queue.</h2>
 
             <p className="success-copy">
-              Your request was sent to the DJ at Tipsys.
+              Your request was sent to the DJ at
+              Tipsys.
             </p>
 
             {selectedSong && (
@@ -1391,9 +1499,7 @@ function App() {
               onClick={() =>
                 setScreen("mostRequested")
               }
-              style={{
-                marginTop: "10px",
-              }}
+              style={{ marginTop: "10px" }}
             >
               🏆 View Most Requested
             </button>
@@ -1401,9 +1507,7 @@ function App() {
             <button
               className="install-button"
               onClick={returnHome}
-              style={{
-                marginTop: "10px",
-              }}
+              style={{ marginTop: "10px" }}
             >
               Back to Tipsys
             </button>
@@ -1452,7 +1556,8 @@ function App() {
               <h2>Send It</h2>
 
               <p>
-                This request will be sent to the DJ at Tipsys.
+                This request will be sent to the DJ
+                at Tipsys.
               </p>
             </div>
 
@@ -1483,7 +1588,9 @@ function App() {
                 placeholder="Who's requesting?"
                 value={requestName}
                 onChange={(event) =>
-                  setRequestName(event.target.value)
+                  setRequestName(
+                    event.target.value
+                  )
                 }
               />
 
@@ -1497,7 +1604,9 @@ function App() {
                 maxLength="120"
                 value={requestMessage}
                 onChange={(event) =>
-                  setRequestMessage(event.target.value)
+                  setRequestMessage(
+                    event.target.value
+                  )
                 }
               />
 
@@ -1512,7 +1621,8 @@ function App() {
                   <strong>Save this song</strong>
 
                   <small>
-                    Add it to your favorites when signed in.
+                    Add it to your favorites when
+                    signed in.
                   </small>
                 </div>
               </label>
@@ -1579,7 +1689,8 @@ function App() {
               <h2>Request Music</h2>
 
               <p>
-                Search for the song you want to hear tonight.
+                Search for the song you want to hear
+                tonight.
               </p>
             </div>
 
@@ -1597,7 +1708,11 @@ function App() {
               />
 
               {search && (
-                <button onClick={() => setSearch("")}>
+                <button
+                  onClick={() =>
+                    setSearch("")
+                  }
+                >
                   ×
                 </button>
               )}
@@ -1630,7 +1745,9 @@ function App() {
                   <button
                     className="song-result"
                     key={song.id}
-                    onClick={() => selectSong(song)}
+                    onClick={() =>
+                      selectSong(song)
+                    }
                   >
                     <div
                       className={`song-art ${song.color}`}
@@ -1639,9 +1756,17 @@ function App() {
                     </div>
 
                     <div className="song-result-info">
-                      <strong>{song.title}</strong>
-                      <span>{song.artist}</span>
-                      <small>{song.album}</small>
+                      <strong>
+                        {song.title}
+                      </strong>
+
+                      <span>
+                        {song.artist}
+                      </span>
+
+                      <small>
+                        {song.album}
+                      </small>
                     </div>
 
                     <div className="add-song-button">
@@ -1793,22 +1918,25 @@ function App() {
                   ["good", "👍", "Good"],
                   ["meh", "😐", "Meh"],
                   ["skip", "⏭", "Skip"],
-                ].map(([key, emoji, label]) => (
-                  <button
-                    key={key}
-                    className="reaction-button"
-                    style={reactionStyle(key)}
-                    onClick={() =>
-                      handleReaction(key)
-                    }
-                  >
-                    <span>{emoji}</span>
+                ].map(
+                  ([key, emoji, label]) => (
+                    <button
+                      key={key}
+                      className="reaction-button"
+                      style={reactionStyle(key)}
+                      onClick={() =>
+                        handleReaction(key)
+                      }
+                    >
+                      <span>{emoji}</span>
 
-                    <small>
-                      {label} · {crowdVotes[key]}
-                    </small>
-                  </button>
-                ))}
+                      <small>
+                        {label} ·{" "}
+                        {crowdVotes[key]}
+                      </small>
+                    </button>
+                  )
+                )}
               </div>
             </section>
 
@@ -1825,14 +1953,18 @@ function App() {
               </div>
 
               <div className="request-button-text">
-                <strong>Request a Song</strong>
+                <strong>
+                  Request a Song
+                </strong>
 
                 <small>
                   Search music and send it to the DJ
                 </small>
               </div>
 
-              <span className="request-arrow">›</span>
+              <span className="request-arrow">
+                ›
+              </span>
             </button>
 
             <section className="quick-actions-section">
@@ -1858,12 +1990,16 @@ function App() {
                 >
                   <span>🏆</span>
 
-                  <strong>Most Requested</strong>
+                  <strong>
+                    Most Requested
+                  </strong>
 
                   <small>
                     {totalRequests > 0
                       ? `${totalRequests} request${
-                          totalRequests === 1 ? "" : "s"
+                          totalRequests === 1
+                            ? ""
+                            : "s"
                         } tonight`
                       : "See what's hot tonight"}
                   </small>
@@ -2004,62 +2140,35 @@ function App() {
                 </span>
               </button>
 
-              <button className="venue-card">
-                <div className="venue-image">
-                  H
-                </div>
+              {[
+                ["H", "The Hideout", "1.4 mi", "Bar · Nightlife"],
+                ["B", "Bar 101", "2.1 mi", "Bar · Music"],
+                ["R", "Riverside Pub", "3.5 mi", "Pub · Nightlife"],
+              ].map(
+                ([letter, name, distance, type]) => (
+                  <button
+                    className="venue-card"
+                    key={name}
+                  >
+                    <div className="venue-image">
+                      {letter}
+                    </div>
 
-                <div className="venue-info">
-                  <h3>The Hideout</h3>
-                  <p>1.4 mi</p>
+                    <div className="venue-info">
+                      <h3>{name}</h3>
+                      <p>{distance}</p>
 
-                  <span className="venue-type">
-                    Bar · Nightlife
-                  </span>
-                </div>
+                      <span className="venue-type">
+                        {type}
+                      </span>
+                    </div>
 
-                <span className="venue-arrow">
-                  ›
-                </span>
-              </button>
-
-              <button className="venue-card">
-                <div className="venue-image">
-                  B
-                </div>
-
-                <div className="venue-info">
-                  <h3>Bar 101</h3>
-                  <p>2.1 mi</p>
-
-                  <span className="venue-type">
-                    Bar · Music
-                  </span>
-                </div>
-
-                <span className="venue-arrow">
-                  ›
-                </span>
-              </button>
-
-              <button className="venue-card">
-                <div className="venue-image">
-                  R
-                </div>
-
-                <div className="venue-info">
-                  <h3>Riverside Pub</h3>
-                  <p>3.5 mi</p>
-
-                  <span className="venue-type">
-                    Pub · Nightlife
-                  </span>
-                </div>
-
-                <span className="venue-arrow">
-                  ›
-                </span>
-              </button>
+                    <span className="venue-arrow">
+                      ›
+                    </span>
+                  </button>
+                )
+              )}
             </div>
 
             <div className="venue-footer">
@@ -2100,7 +2209,9 @@ function App() {
           </p>
 
           <div className="hero">
-            <div className="dj-mark">DJ</div>
+            <div className="dj-mark">
+              DJ
+            </div>
           </div>
 
           <div className="actions">
@@ -2133,7 +2244,7 @@ function App() {
 
 /*
   =========================
-  SMALL DASHBOARD COMPONENTS
+  COMPONENTS
   =========================
 */
 
@@ -2177,6 +2288,49 @@ function DashboardStat({
   );
 }
 
+function DashboardHeading({
+  eyebrow,
+  title,
+  side,
+  sideColor = "#747d91",
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "12px",
+      }}
+    >
+      <div>
+        <p className="eyebrow">
+          {eyebrow}
+        </p>
+
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "22px",
+          }}
+        >
+          {title}
+        </h2>
+      </div>
+
+      <span
+        style={{
+          color: sideColor,
+          fontSize: "9px",
+          fontWeight: 800,
+        }}
+      >
+        {side}
+      </span>
+    </div>
+  );
+}
+
 function EmptyDashboardCard({
   icon,
   title,
@@ -2193,11 +2347,7 @@ function EmptyDashboardCard({
         textAlign: "center",
       }}
     >
-      <div
-        style={{
-          fontSize: "34px",
-        }}
-      >
+      <div style={{ fontSize: "34px" }}>
         {icon}
       </div>
 
@@ -2220,6 +2370,224 @@ function EmptyDashboardCard({
         {text}
       </p>
     </div>
+  );
+}
+
+function IncomingRequestCard({
+  request,
+  onApprove,
+  onDecline,
+  formatRequestTime,
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          "58px minmax(0,1fr)",
+        gap: "12px",
+        padding: "13px",
+        border:
+          "1px solid rgba(255,47,183,0.20)",
+        borderRadius: "15px",
+        background:
+          "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))",
+      }}
+    >
+      <div
+        className={`song-art ${request.song.color}`}
+        style={{
+          width: "58px",
+          height: "58px",
+        }}
+      >
+        ♫
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <strong
+              style={{
+                display: "block",
+                fontSize: "13px",
+              }}
+            >
+              {request.song.title}
+            </strong>
+
+            <span
+              style={{
+                display: "block",
+                marginTop: "3px",
+                color: "#8992a6",
+                fontSize: "9px",
+              }}
+            >
+              {request.song.artist}
+            </span>
+          </div>
+
+          <span
+            style={{
+              color: "#626c80",
+              fontSize: "8px",
+            }}
+          >
+            {formatRequestTime(
+              request.submittedAt
+            )}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "7px",
+            marginTop: "9px",
+          }}
+        >
+          <span
+            style={{
+              color: "#ff47bf",
+              fontSize: "9px",
+              fontWeight: 800,
+            }}
+          >
+            {request.name}
+          </span>
+
+          <span style={{ color: "#3d4557" }}>
+            •
+          </span>
+
+          <span
+            style={{
+              color: "#6e778c",
+              fontSize: "8px",
+            }}
+          >
+            Guest Request
+          </span>
+        </div>
+
+        {request.message && (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "8px 10px",
+              borderRadius: "9px",
+              color: "#aab1c1",
+              background:
+                "rgba(255,255,255,0.035)",
+              fontSize: "9px",
+              lineHeight: 1.5,
+            }}
+          >
+            “{request.message}”
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "8px",
+            marginTop: "11px",
+          }}
+        >
+          <button
+            onClick={onApprove}
+            style={{
+              padding: "9px",
+              border:
+                "1px solid rgba(88,229,191,0.35)",
+              borderRadius: "9px",
+              color: "#58e5bf",
+              background:
+                "rgba(88,229,191,0.08)",
+              fontSize: "9px",
+              fontWeight: 900,
+            }}
+          >
+            ✓ APPROVE + QUEUE
+          </button>
+
+          <button
+            onClick={onDecline}
+            style={{
+              padding: "9px",
+              border:
+                "1px solid rgba(255,101,125,0.30)",
+              borderRadius: "9px",
+              color: "#ff657d",
+              background:
+                "rgba(255,101,125,0.07)",
+              fontSize: "9px",
+              fontWeight: 900,
+            }}
+          >
+            × DECLINE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QueueButton({
+  children,
+  onClick,
+  disabled = false,
+  danger = false,
+  blue = false,
+}) {
+  let color = "#dce0ea";
+  let border =
+    "1px solid rgba(255,255,255,0.10)";
+  let background =
+    "rgba(255,255,255,0.035)";
+
+  if (danger) {
+    color = "#ff657d";
+    border =
+      "1px solid rgba(255,101,125,0.20)";
+    background =
+      "rgba(255,101,125,0.05)";
+  }
+
+  if (blue) {
+    color = "#6cb8ff";
+    border =
+      "1px solid rgba(108,184,255,0.25)";
+    background =
+      "rgba(108,184,255,0.06)";
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        minHeight: "30px",
+        padding: "0 6px",
+        border,
+        borderRadius: "8px",
+        color: disabled ? "#41495a" : color,
+        background,
+        opacity: disabled ? 0.5 : 1,
+        fontSize: "7px",
+        fontWeight: 900,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
