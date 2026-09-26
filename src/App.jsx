@@ -48,17 +48,10 @@ const demoSongs = [
 
 function App() {
   const [screen, setScreen] = useState("welcome");
-
   const [search, setSearch] = useState("");
-
-  const [selectedSong, setSelectedSong] =
-    useState(null);
-
-  const [requestName, setRequestName] =
-    useState("");
-
-  const [requestMessage, setRequestMessage] =
-    useState("");
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [requestName, setRequestName] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
 
   const [selectedReaction, setSelectedReaction] =
     useState(null);
@@ -70,33 +63,16 @@ function App() {
     skip: 1,
   });
 
-  /*
-    Every submitted request is stored here.
-
-    Later this same request data will feed:
-    - DJ request queue
-    - request history
-    - Most Requested
-    - Serato matching
-  */
   const [requests, setRequests] = useState([]);
 
-  const filteredSongs = demoSongs.filter(
-    (song) => {
-      const query = search
-        .trim()
-        .toLowerCase();
+  const filteredSongs = demoSongs.filter((song) => {
+    const query = search.trim().toLowerCase();
 
-      return (
-        song.title
-          .toLowerCase()
-          .includes(query) ||
-        song.artist
-          .toLowerCase()
-          .includes(query)
-      );
-    }
-  );
+    return (
+      song.title.toLowerCase().includes(query) ||
+      song.artist.toLowerCase().includes(query)
+    );
+  });
 
   const totalVotes =
     crowdVotes.fire +
@@ -108,30 +84,29 @@ function App() {
     totalVotes === 0
       ? 0
       : Math.round(
-          ((crowdVotes.fire +
-            crowdVotes.good) /
+          ((crowdVotes.fire + crowdVotes.good) /
             totalVotes) *
             100
         );
 
-  /*
-    Build the Most Requested ranking.
+  const totalRequests = requests.length;
 
-    Example:
-    Low requested 3 times
-    Temperature requested 2 times
+  const pendingRequests = requests.filter(
+    (request) => request.status === "pending"
+  );
 
-    becomes:
-    [
-      { song: Low, count: 3 },
-      { song: Temperature, count: 2 }
-    ]
-  */
+  const approvedRequests = requests.filter(
+    (request) => request.status === "approved"
+  );
+
+  const declinedRequests = requests.filter(
+    (request) => request.status === "declined"
+  );
+
   const requestRanking = demoSongs
     .map((song) => {
       const songRequests = requests.filter(
-        (request) =>
-          request.song.id === song.id
+        (request) => request.song.id === song.id
       );
 
       return {
@@ -144,12 +119,8 @@ function App() {
         return b.count - a.count;
       }
 
-      return a.song.title.localeCompare(
-        b.song.title
-      );
+      return a.song.title.localeCompare(b.song.title);
     });
-
-  const totalRequests = requests.length;
 
   function selectSong(song) {
     setSelectedSong(song);
@@ -162,22 +133,11 @@ function App() {
     }
 
     const newRequest = {
-      id:
-        Date.now() +
-        Math.random(),
-
+      id: Date.now() + Math.random(),
       song: selectedSong,
-
-      name:
-        requestName.trim() ||
-        "Guest",
-
-      message:
-        requestMessage.trim(),
-
-      submittedAt:
-        new Date().toISOString(),
-
+      name: requestName.trim() || "Guest",
+      message: requestMessage.trim(),
+      submittedAt: new Date().toISOString(),
       status: "pending",
     };
 
@@ -216,13 +176,10 @@ function App() {
       };
 
       if (selectedReaction) {
-        updatedVotes[selectedReaction] =
-          Math.max(
-            0,
-            updatedVotes[
-              selectedReaction
-            ] - 1
-          );
+        updatedVotes[selectedReaction] = Math.max(
+          0,
+          updatedVotes[selectedReaction] - 1
+        );
       }
 
       updatedVotes[reaction] =
@@ -235,41 +192,708 @@ function App() {
   }
 
   function reactionStyle(reaction) {
-    if (
-      selectedReaction !== reaction
-    ) {
+    if (selectedReaction !== reaction) {
       return {};
     }
 
     return {
-      borderColor:
-        "rgba(255, 49, 181, 0.9)",
-
+      borderColor: "rgba(255, 49, 181, 0.9)",
       background:
         "linear-gradient(145deg, rgba(255, 28, 172, 0.20), rgba(80, 34, 180, 0.18))",
-
       boxShadow:
         "0 0 18px rgba(255, 49, 181, 0.20)",
-
-      transform:
-        "translateY(-2px)",
+      transform: "translateY(-2px)",
     };
   }
 
   function getRankIcon(index) {
-    if (index === 0) {
-      return "🥇";
-    }
-
-    if (index === 1) {
-      return "🥈";
-    }
-
-    if (index === 2) {
-      return "🥉";
-    }
+    if (index === 0) return "🥇";
+    if (index === 1) return "🥈";
+    if (index === 2) return "🥉";
 
     return `#${index + 1}`;
+  }
+
+  function updateRequestStatus(requestId, newStatus) {
+    setRequests((currentRequests) =>
+      currentRequests.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              status: newStatus,
+            }
+          : request
+      )
+    );
+  }
+
+  function statusColor(status) {
+    if (status === "approved") {
+      return "#58e5bf";
+    }
+
+    if (status === "declined") {
+      return "#ff657d";
+    }
+
+    return "#ff47bf";
+  }
+
+  function formatRequestTime(timestamp) {
+    const date = new Date(timestamp);
+
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  /*
+    =========================
+    DJ DASHBOARD
+    =========================
+  */
+
+  if (screen === "djDashboard") {
+    return (
+      <main
+        className="app"
+        style={{
+          alignItems: "flex-start",
+        }}
+      >
+        <section
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            width: "min(1100px, 100%)",
+            minHeight: "760px",
+            padding: "24px",
+            border:
+              "1px solid rgba(255, 42, 184, 0.40)",
+            borderRadius: "24px",
+            background:
+              "linear-gradient(180deg, rgba(15,8,28,0.98), rgba(3,7,16,0.98))",
+            boxShadow:
+              "0 0 35px rgba(255,0,170,0.10)",
+          }}
+        >
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div
+            style={{
+              position: "relative",
+              zIndex: 2,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "20px",
+                flexWrap: "wrap",
+                marginBottom: "26px",
+              }}
+            >
+              <div>
+                <div
+                  className="mini-brand"
+                  style={{
+                    textAlign: "left",
+                  }}
+                >
+                  DJ LIVE <span>♕</span>
+                </div>
+
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    color: "#747d91",
+                    fontSize: "11px",
+                  }}
+                >
+                  DJ Dashboard · Tipsys
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span className="large-live-pill">
+                  LIVE
+                </span>
+
+                <button
+                  className="secondary-button"
+                  style={{
+                    width: "auto",
+                    padding: "10px 15px",
+                  }}
+                  onClick={() =>
+                    setScreen("venueHome")
+                  }
+                >
+                  Customer View
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "10px",
+                marginBottom: "24px",
+              }}
+            >
+              <div
+                style={{
+                  padding: "16px",
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#ff47bf",
+                    fontSize: "26px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {pendingRequests.length}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                  }}
+                >
+                  PENDING
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "16px",
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#58e5bf",
+                    fontSize: "26px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {approvedRequests.length}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                  }}
+                >
+                  APPROVED
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "16px",
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#ff657d",
+                    fontSize: "26px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {declinedRequests.length}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                  }}
+                >
+                  DECLINED
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "16px",
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#dce0ea",
+                    fontSize: "26px",
+                    fontWeight: 900,
+                  }}
+                >
+                  {totalRequests}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                  }}
+                >
+                  TOTAL TONIGHT
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "minmax(0, 1.6fr) minmax(260px, 0.8fr)",
+                gap: "18px",
+              }}
+            >
+              <section
+                style={{
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <div>
+                    <p className="eyebrow">
+                      LIVE REQUESTS
+                    </p>
+
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontSize: "22px",
+                      }}
+                    >
+                      Incoming Requests
+                    </h2>
+                  </div>
+
+                  <span
+                    style={{
+                      color: "#747d91",
+                      fontSize: "9px",
+                    }}
+                  >
+                    {pendingRequests.length} waiting
+                  </span>
+                </div>
+
+                {pendingRequests.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "50px 20px",
+                      border:
+                        "1px solid rgba(255,255,255,0.07)",
+                      borderRadius: "16px",
+                      background:
+                        "rgba(10,14,25,0.75)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "34px",
+                      }}
+                    >
+                      🎧
+                    </div>
+
+                    <h3
+                      style={{
+                        margin: "12px 0 5px",
+                        fontSize: "15px",
+                      }}
+                    >
+                      Queue is clear
+                    </h3>
+
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#747d91",
+                        fontSize: "10px",
+                      }}
+                    >
+                      New customer requests will
+                      appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: "10px",
+                    }}
+                  >
+                    {pendingRequests
+                      .slice()
+                      .reverse()
+                      .map((request) => (
+                        <div
+                          key={request.id}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "58px minmax(0,1fr)",
+                            gap: "12px",
+                            padding: "13px",
+                            border:
+                              "1px solid rgba(255,47,183,0.20)",
+                            borderRadius: "15px",
+                            background:
+                              "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))",
+                          }}
+                        >
+                          <div
+                            className={`song-art ${request.song.color}`}
+                            style={{
+                              width: "58px",
+                              height: "58px",
+                            }}
+                          >
+                            ♫
+                          </div>
+
+                          <div
+                            style={{
+                              minWidth: 0,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent:
+                                  "space-between",
+                                gap: "10px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  minWidth: 0,
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    display: "block",
+                                    overflow: "hidden",
+                                    textOverflow:
+                                      "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    fontSize: "13px",
+                                  }}
+                                >
+                                  {request.song.title}
+                                </strong>
+
+                                <span
+                                  style={{
+                                    display: "block",
+                                    overflow: "hidden",
+                                    textOverflow:
+                                      "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    marginTop: "3px",
+                                    color: "#8992a6",
+                                    fontSize: "9px",
+                                  }}
+                                >
+                                  {request.song.artist}
+                                </span>
+                              </div>
+
+                              <span
+                                style={{
+                                  flexShrink: 0,
+                                  color: "#626c80",
+                                  fontSize: "8px",
+                                }}
+                              >
+                                {formatRequestTime(
+                                  request.submittedAt
+                                )}
+                              </span>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "7px",
+                                marginTop: "9px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: "#ff47bf",
+                                  fontSize: "9px",
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {request.name}
+                              </span>
+
+                              <span
+                                style={{
+                                  color: "#3d4557",
+                                }}
+                              >
+                                •
+                              </span>
+
+                              <span
+                                style={{
+                                  color: "#6e778c",
+                                  fontSize: "8px",
+                                }}
+                              >
+                                Guest Request
+                              </span>
+                            </div>
+
+                            {request.message && (
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  padding: "8px 10px",
+                                  borderRadius: "9px",
+                                  color: "#aab1c1",
+                                  background:
+                                    "rgba(255,255,255,0.035)",
+                                  fontSize: "9px",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                “{request.message}”
+                              </div>
+                            )}
+
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "1fr 1fr",
+                                gap: "8px",
+                                marginTop: "11px",
+                              }}
+                            >
+                              <button
+                                onClick={() =>
+                                  updateRequestStatus(
+                                    request.id,
+                                    "approved"
+                                  )
+                                }
+                                style={{
+                                  padding: "9px",
+                                  border:
+                                    "1px solid rgba(88,229,191,0.35)",
+                                  borderRadius: "9px",
+                                  color: "#58e5bf",
+                                  background:
+                                    "rgba(88,229,191,0.08)",
+                                  fontSize: "9px",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                ✓ APPROVE
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  updateRequestStatus(
+                                    request.id,
+                                    "declined"
+                                  )
+                                }
+                                style={{
+                                  padding: "9px",
+                                  border:
+                                    "1px solid rgba(255,101,125,0.30)",
+                                  borderRadius: "9px",
+                                  color: "#ff657d",
+                                  background:
+                                    "rgba(255,101,125,0.07)",
+                                  fontSize: "9px",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                × DECLINE
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <p className="eyebrow">
+                  ACTIVITY
+                </p>
+
+                <h2
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: "22px",
+                  }}
+                >
+                  Recent Decisions
+                </h2>
+
+                {requests.filter(
+                  (request) =>
+                    request.status !== "pending"
+                ).length === 0 ? (
+                  <div
+                    style={{
+                      padding: "25px 16px",
+                      border:
+                        "1px solid rgba(255,255,255,0.07)",
+                      borderRadius: "14px",
+                      color: "#747d91",
+                      background:
+                        "rgba(10,14,25,0.75)",
+                      textAlign: "center",
+                      fontSize: "9px",
+                    }}
+                  >
+                    Approve or decline a request
+                    and it will appear here.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: "8px",
+                    }}
+                  >
+                    {requests
+                      .filter(
+                        (request) =>
+                          request.status !==
+                          "pending"
+                      )
+                      .slice()
+                      .reverse()
+                      .map((request) => (
+                        <div
+                          key={request.id}
+                          style={{
+                            padding: "11px",
+                            border:
+                              "1px solid rgba(255,255,255,0.07)",
+                            borderRadius: "12px",
+                            background:
+                              "rgba(10,14,25,0.85)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent:
+                                "space-between",
+                              gap: "8px",
+                            }}
+                          >
+                            <strong
+                              style={{
+                                overflow: "hidden",
+                                textOverflow:
+                                  "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontSize: "10px",
+                              }}
+                            >
+                              {request.song.title}
+                            </strong>
+
+                            <span
+                              style={{
+                                color: statusColor(
+                                  request.status
+                                ),
+                                fontSize: "7px",
+                                fontWeight: 900,
+                                textTransform:
+                                  "uppercase",
+                              }}
+                            >
+                              {request.status}
+                            </span>
+                          </div>
+
+                          <span
+                            style={{
+                              display: "block",
+                              marginTop: "4px",
+                              color: "#687185",
+                              fontSize: "8px",
+                            }}
+                          >
+                            Requested by{" "}
+                            {request.name}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   /*
@@ -323,59 +947,38 @@ function App() {
 
               <p
                 style={{
-                  margin:
-                    "8px 0 0",
-
-                  color:
-                    "#9199ad",
-
-                  fontSize:
-                    "13px",
+                  margin: "8px 0 0",
+                  color: "#9199ad",
+                  fontSize: "13px",
                 }}
               >
-                What the crowd wants
-                to hear tonight.
+                What the crowd wants to hear
+                tonight.
               </p>
             </div>
 
             <div
               style={{
                 display: "grid",
-
-                gridTemplateColumns:
-                  "1fr 1fr",
-
+                gridTemplateColumns: "1fr 1fr",
                 gap: "10px",
-
-                marginBottom:
-                  "22px",
+                marginBottom: "22px",
               }}
             >
               <div
                 style={{
-                  padding:
-                    "14px",
-
+                  padding: "14px",
                   border:
                     "1px solid rgba(255,255,255,0.08)",
-
-                  borderRadius:
-                    "14px",
-
-                  background:
-                    "rgba(10,14,25,0.94)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
                 }}
               >
                 <div
                   style={{
-                    color:
-                      "#ff43bd",
-
-                    fontSize:
-                      "23px",
-
-                    fontWeight:
-                      "900",
+                    color: "#ff43bd",
+                    fontSize: "23px",
+                    fontWeight: 900,
                   }}
                 >
                   {totalRequests}
@@ -383,20 +986,11 @@ function App() {
 
                 <div
                   style={{
-                    marginTop:
-                      "4px",
-
-                    color:
-                      "#737c91",
-
-                    fontSize:
-                      "8px",
-
-                    fontWeight:
-                      "800",
-
-                    letterSpacing:
-                      "1px",
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "8px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
                   }}
                 >
                   TOTAL REQUESTS
@@ -405,55 +999,34 @@ function App() {
 
               <div
                 style={{
-                  padding:
-                    "14px",
-
+                  padding: "14px",
                   border:
                     "1px solid rgba(255,255,255,0.08)",
-
-                  borderRadius:
-                    "14px",
-
-                  background:
-                    "rgba(10,14,25,0.94)",
+                  borderRadius: "14px",
+                  background: "rgba(10,14,25,0.94)",
                 }}
               >
                 <div
                   style={{
-                    color:
-                      "#58e5bf",
-
-                    fontSize:
-                      "23px",
-
-                    fontWeight:
-                      "900",
+                    color: "#58e5bf",
+                    fontSize: "23px",
+                    fontWeight: 900,
                   }}
                 >
                   {
                     requestRanking.filter(
-                      (item) =>
-                        item.count > 0
+                      (item) => item.count > 0
                     ).length
                   }
                 </div>
 
                 <div
                   style={{
-                    marginTop:
-                      "4px",
-
-                    color:
-                      "#737c91",
-
-                    fontSize:
-                      "8px",
-
-                    fontWeight:
-                      "800",
-
-                    letterSpacing:
-                      "1px",
+                    marginTop: "4px",
+                    color: "#737c91",
+                    fontSize: "8px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
                   }}
                 >
                   SONGS REQUESTED
@@ -463,29 +1036,17 @@ function App() {
 
             <div
               style={{
-                display:
-                  "flex",
-
-                alignItems:
-                  "center",
-
-                justifyContent:
-                  "space-between",
-
-                marginBottom:
-                  "10px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "10px",
               }}
             >
               <span
                 style={{
-                  color:
-                    "#dce0ea",
-
-                  fontSize:
-                    "11px",
-
-                  fontWeight:
-                    "800",
+                  color: "#dce0ea",
+                  fontSize: "11px",
+                  fontWeight: 800,
                 }}
               >
                 Tonight's Ranking
@@ -493,14 +1054,9 @@ function App() {
 
               <span
                 style={{
-                  color:
-                    "#70798e",
-
-                  fontSize:
-                    "8px",
-
-                  fontWeight:
-                    "800",
+                  color: "#70798e",
+                  fontSize: "8px",
+                  fontWeight: 800,
                 }}
               >
                 LIVE
@@ -509,215 +1065,129 @@ function App() {
 
             <div
               style={{
-                display:
-                  "grid",
-
-                gap:
-                  "9px",
+                display: "grid",
+                gap: "9px",
               }}
             >
-              {requestRanking.map(
-                (item, index) => (
+              {requestRanking.map((item, index) => (
+                <div
+                  key={item.song.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "40px 52px 1fr 55px",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "10px",
+                    border:
+                      item.count > 0
+                        ? "1px solid rgba(255,47,183,0.24)"
+                        : "1px solid rgba(255,255,255,0.07)",
+                    borderRadius: "13px",
+                    background:
+                      item.count > 0
+                        ? "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))"
+                        : "rgba(10,14,25,0.90)",
+                    opacity: item.count > 0 ? 1 : 0.55,
+                  }}
+                >
                   <div
-                    key={
-                      item.song.id
-                    }
                     style={{
-                      display:
-                        "grid",
-
-                      gridTemplateColumns:
-                        "40px 52px 1fr 55px",
-
-                      alignItems:
-                        "center",
-
-                      gap:
-                        "10px",
-
-                      padding:
-                        "10px",
-
-                      border:
-                        item.count >
-                        0
-                          ? "1px solid rgba(255,47,183,0.24)"
-                          : "1px solid rgba(255,255,255,0.07)",
-
-                      borderRadius:
-                        "13px",
-
-                      background:
-                        item.count >
-                        0
-                          ? "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))"
-                          : "rgba(10,14,25,0.90)",
-
-                      opacity:
-                        item.count >
-                        0
-                          ? 1
-                          : 0.55,
+                      textAlign: "center",
+                      fontSize:
+                        index < 3 ? "20px" : "10px",
+                      color: "#747d91",
+                      fontWeight: 900,
                     }}
                   >
-                    <div
-                      style={{
-                        textAlign:
-                          "center",
-
-                        fontSize:
-                          index < 3
-                            ? "20px"
-                            : "10px",
-
-                        color:
-                          "#747d91",
-
-                        fontWeight:
-                          "900",
-                      }}
-                    >
-                      {getRankIcon(
-                        index
-                      )}
-                    </div>
-
-                    <div
-                      className={`song-art ${item.song.color}`}
-                    >
-                      ♫
-                    </div>
-
-                    <div
-                      style={{
-                        minWidth:
-                          0,
-
-                        display:
-                          "flex",
-
-                        flexDirection:
-                          "column",
-
-                        gap:
-                          "3px",
-                      }}
-                    >
-                      <strong
-                        style={{
-                          overflow:
-                            "hidden",
-
-                          textOverflow:
-                            "ellipsis",
-
-                          whiteSpace:
-                            "nowrap",
-
-                          fontSize:
-                            "11px",
-                        }}
-                      >
-                        {
-                          item.song
-                            .title
-                        }
-                      </strong>
-
-                      <span
-                        style={{
-                          overflow:
-                            "hidden",
-
-                          textOverflow:
-                            "ellipsis",
-
-                          whiteSpace:
-                            "nowrap",
-
-                          color:
-                            "#8992a6",
-
-                          fontSize:
-                            "8px",
-                        }}
-                      >
-                        {
-                          item.song
-                            .artist
-                        }
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        textAlign:
-                          "right",
-                      }}
-                    >
-                      <strong
-                        style={{
-                          display:
-                            "block",
-
-                          color:
-                            item.count >
-                            0
-                              ? "#ff47bf"
-                              : "#646d81",
-
-                          fontSize:
-                            "16px",
-                        }}
-                      >
-                        {
-                          item.count
-                        }
-                      </strong>
-
-                      <span
-                        style={{
-                          color:
-                            "#687185",
-
-                          fontSize:
-                            "7px",
-                        }}
-                      >
-                        {item.count ===
-                        1
-                          ? "REQUEST"
-                          : "REQUESTS"}
-                      </span>
-                    </div>
+                    {getRankIcon(index)}
                   </div>
-                )
-              )}
+
+                  <div
+                    className={`song-art ${item.song.color}`}
+                  >
+                    ♫
+                  </div>
+
+                  <div
+                    style={{
+                      minWidth: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "3px",
+                    }}
+                  >
+                    <strong
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {item.song.title}
+                    </strong>
+
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        color: "#8992a6",
+                        fontSize: "8px",
+                      }}
+                    >
+                      {item.song.artist}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      textAlign: "right",
+                    }}
+                  >
+                    <strong
+                      style={{
+                        display: "block",
+                        color:
+                          item.count > 0
+                            ? "#ff47bf"
+                            : "#646d81",
+                        fontSize: "16px",
+                      }}
+                    >
+                      {item.count}
+                    </strong>
+
+                    <span
+                      style={{
+                        color: "#687185",
+                        fontSize: "7px",
+                      }}
+                    >
+                      {item.count === 1
+                        ? "REQUEST"
+                        : "REQUESTS"}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {totalRequests === 0 && (
               <div
                 style={{
-                  marginTop:
-                    "18px",
-
-                  padding:
-                    "14px",
-
-                  borderRadius:
-                    "12px",
-
-                  textAlign:
-                    "center",
-
+                  marginTop: "18px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  textAlign: "center",
                   background:
                     "rgba(255,255,255,0.03)",
                 }}
               >
                 <div
                   style={{
-                    fontSize:
-                      "22px",
+                    fontSize: "22px",
                   }}
                 >
                   🎧
@@ -725,14 +1195,9 @@ function App() {
 
                 <strong
                   style={{
-                    display:
-                      "block",
-
-                    marginTop:
-                      "6px",
-
-                    fontSize:
-                      "11px",
+                    display: "block",
+                    marginTop: "6px",
+                    fontSize: "11px",
                   }}
                 >
                   No requests yet
@@ -740,18 +1205,13 @@ function App() {
 
                 <p
                   style={{
-                    margin:
-                      "4px 0 0",
-
-                    color:
-                      "#747d91",
-
-                    fontSize:
-                      "8px",
+                    margin: "4px 0 0",
+                    color: "#747d91",
+                    fontSize: "8px",
                   }}
                 >
-                  Be the first to
-                  request something.
+                  Be the first to request
+                  something.
                 </p>
               </div>
             )}
@@ -759,13 +1219,10 @@ function App() {
             <button
               className="request-song-button"
               style={{
-                marginTop:
-                  "20px",
+                marginTop: "20px",
               }}
               onClick={() =>
-                setScreen(
-                  "requestMusic"
-                )
+                setScreen("requestMusic")
               }
             >
               <div>
@@ -775,13 +1232,11 @@ function App() {
               </div>
 
               <div className="request-button-text">
-                <strong>
-                  Request a Song
-                </strong>
+                <strong>Request a Song</strong>
 
                 <small>
-                  Add your vote to
-                  tonight's music
+                  Add your vote to tonight's
+                  music
                 </small>
               </div>
 
@@ -793,9 +1248,7 @@ function App() {
             <div className="venue-footer">
               <button
                 onClick={() =>
-                  setScreen(
-                    "venueHome"
-                  )
+                  setScreen("venueHome")
                 }
               >
                 ⌂
@@ -803,9 +1256,7 @@ function App() {
 
               <button
                 onClick={() =>
-                  setScreen(
-                    "requestMusic"
-                  )
+                  setScreen("requestMusic")
                 }
               >
                 ⌕
@@ -815,9 +1266,7 @@ function App() {
                 ♫
               </button>
 
-              <button>
-                ☰
-              </button>
+              <button>☰</button>
             </div>
           </div>
         </section>
@@ -843,21 +1292,17 @@ function App() {
               DJ LIVE <span>♕</span>
             </div>
 
-            <div className="success-icon">
-              ✓
-            </div>
+            <div className="success-icon">✓</div>
 
             <p className="eyebrow">
               REQUEST SENT
             </p>
 
-            <h2>
-              You're in the queue.
-            </h2>
+            <h2>You're in the queue.</h2>
 
             <p className="success-copy">
-              Your request was sent
-              to the DJ at Tipsys.
+              Your request was sent to the DJ
+              at Tipsys.
             </p>
 
             {selectedSong && (
@@ -870,15 +1315,11 @@ function App() {
 
                 <div>
                   <strong>
-                    {
-                      selectedSong.title
-                    }
+                    {selectedSong.title}
                   </strong>
 
                   <span>
-                    {
-                      selectedSong.artist
-                    }
+                    {selectedSong.artist}
                   </span>
                 </div>
               </div>
@@ -888,18 +1329,15 @@ function App() {
               <span>⚡</span>
 
               <p>
-                Requests aren't
-                guaranteed to play.
-                The DJ controls the
-                final queue.
+                Requests aren't guaranteed to
+                play. The DJ controls the final
+                queue.
               </p>
             </div>
 
             <button
               className="primary-button"
-              onClick={
-                resetRequest
-              }
+              onClick={resetRequest}
             >
               ＋ Request Another Song
             </button>
@@ -907,13 +1345,10 @@ function App() {
             <button
               className="secondary-button"
               onClick={() =>
-                setScreen(
-                  "mostRequested"
-                )
+                setScreen("mostRequested")
               }
               style={{
-                marginTop:
-                  "10px",
+                marginTop: "10px",
               }}
             >
               🏆 View Most Requested
@@ -921,12 +1356,9 @@ function App() {
 
             <button
               className="install-button"
-              onClick={
-                returnHome
-              }
+              onClick={returnHome}
               style={{
-                marginTop:
-                  "10px",
+                marginTop: "10px",
               }}
             >
               Back to Tipsys
@@ -955,9 +1387,7 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen(
-                    "requestMusic"
-                  )
+                  setScreen("requestMusic")
                 }
               >
                 ←
@@ -975,14 +1405,11 @@ function App() {
                 SONG REQUEST
               </p>
 
-              <h2>
-                Send It
-              </h2>
+              <h2>Send It</h2>
 
               <p>
-                This request will be
-                sent to the DJ at
-                Tipsys.
+                This request will be sent to the
+                DJ at Tipsys.
               </p>
             </div>
 
@@ -995,20 +1422,14 @@ function App() {
                 </div>
 
                 <div className="selected-song-info">
-                  <span>
-                    YOUR REQUEST
-                  </span>
+                  <span>YOUR REQUEST</span>
 
                   <h3>
-                    {
-                      selectedSong.title
-                    }
+                    {selectedSong.title}
                   </h3>
 
                   <p>
-                    {
-                      selectedSong.artist
-                    }
+                    {selectedSong.artist}
                   </p>
                 </div>
               </div>
@@ -1017,61 +1438,42 @@ function App() {
             <div className="request-form">
               <label>
                 Your Name
-                <span>
-                  OPTIONAL
-                </span>
+                <span>OPTIONAL</span>
               </label>
 
               <input
                 type="text"
                 placeholder="Who's requesting?"
-                value={
-                  requestName
-                }
-                onChange={(
-                  event
-                ) =>
+                value={requestName}
+                onChange={(event) =>
                   setRequestName(
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
               />
 
               <label>
                 Message to DJ
-                <span>
-                  OPTIONAL
-                </span>
+                <span>OPTIONAL</span>
               </label>
 
               <textarea
                 placeholder="Birthday, shoutout, please play this next..."
                 maxLength="120"
-                value={
-                  requestMessage
-                }
-                onChange={(
-                  event
-                ) =>
+                value={requestMessage}
+                onChange={(event) =>
                   setRequestMessage(
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
               />
 
               <div className="character-count">
-                {
-                  requestMessage.length
-                }
-                /120
+                {requestMessage.length}/120
               </div>
 
               <label className="save-song-row">
-                <input
-                  type="checkbox"
-                />
+                <input type="checkbox" />
 
                 <div>
                   <strong>
@@ -1079,32 +1481,26 @@ function App() {
                   </strong>
 
                   <small>
-                    Add it to your
-                    favorites when
-                    signed in.
+                    Add it to your favorites
+                    when signed in.
                   </small>
                 </div>
               </label>
             </div>
 
             <div className="request-warning">
-              <span>
-                ♫
-              </span>
+              <span>♫</span>
 
               <p>
-                Sending a request
-                doesn't guarantee it
-                will be played. Your
-                DJ controls the vibe.
+                Sending a request doesn't
+                guarantee it will be played.
+                Your DJ controls the vibe.
               </p>
             </div>
 
             <button
               className="send-request-button"
-              onClick={
-                submitRequest
-              }
+              onClick={submitRequest}
             >
               ⚡ Send Request
             </button>
@@ -1132,9 +1528,7 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen(
-                    "venueHome"
-                  )
+                  setScreen("venueHome")
                 }
               >
                 ←
@@ -1152,44 +1546,30 @@ function App() {
                 TIPSYS · LIVE
               </p>
 
-              <h2>
-                Request Music
-              </h2>
+              <h2>Request Music</h2>
 
               <p>
-                Search for the song
-                you want to hear
-                tonight.
+                Search for the song you want to
+                hear tonight.
               </p>
             </div>
 
             <div className="music-search">
-              <span>
-                ⌕
-              </span>
+              <span>⌕</span>
 
               <input
                 type="text"
                 placeholder="Song or artist..."
-                value={
-                  search
-                }
-                onChange={(
-                  event
-                ) =>
-                  setSearch(
-                    event.target
-                      .value
-                  )
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
                 }
                 autoFocus
               />
 
               {search && (
                 <button
-                  onClick={() =>
-                    setSearch("")
-                  }
+                  onClick={() => setSearch("")}
                 >
                   ×
                 </button>
@@ -1201,13 +1581,8 @@ function App() {
                 All
               </button>
 
-              <button>
-                Popular
-              </button>
-
-              <button>
-                Tonight
-              </button>
+              <button>Popular</button>
+              <button>Tonight</button>
             </div>
 
             <div className="song-results-header">
@@ -1218,74 +1593,54 @@ function App() {
               </span>
 
               <span>
-                {
-                  filteredSongs.length
-                }{" "}
-                SONGS
+                {filteredSongs.length} SONGS
               </span>
             </div>
 
             <div className="song-results">
-              {filteredSongs.length >
-              0 ? (
-                filteredSongs.map(
-                  (song) => (
-                    <button
-                      className="song-result"
-                      key={
-                        song.id
-                      }
-                      onClick={() =>
-                        selectSong(
-                          song
-                        )
-                      }
+              {filteredSongs.length > 0 ? (
+                filteredSongs.map((song) => (
+                  <button
+                    className="song-result"
+                    key={song.id}
+                    onClick={() =>
+                      selectSong(song)
+                    }
+                  >
+                    <div
+                      className={`song-art ${song.color}`}
                     >
-                      <div
-                        className={`song-art ${song.color}`}
-                      >
-                        ♫
-                      </div>
+                      ♫
+                    </div>
 
-                      <div className="song-result-info">
-                        <strong>
-                          {
-                            song.title
-                          }
-                        </strong>
+                    <div className="song-result-info">
+                      <strong>
+                        {song.title}
+                      </strong>
 
-                        <span>
-                          {
-                            song.artist
-                          }
-                        </span>
+                      <span>
+                        {song.artist}
+                      </span>
 
-                        <small>
-                          {
-                            song.album
-                          }
-                        </small>
-                      </div>
+                      <small>
+                        {song.album}
+                      </small>
+                    </div>
 
-                      <div className="add-song-button">
-                        ＋
-                      </div>
-                    </button>
-                  )
-                )
+                    <div className="add-song-button">
+                      ＋
+                    </div>
+                  </button>
+                ))
               ) : (
                 <div className="no-results">
-                  <span>
-                    ⌕
-                  </span>
+                  <span>⌕</span>
 
-                  <h3>
-                    No songs found
-                  </h3>
+                  <h3>No songs found</h3>
 
                   <p>
-                    Try another song
-                    title or artist.
+                    Try another song title or
+                    artist.
                   </p>
                 </div>
               )}
@@ -1294,9 +1649,7 @@ function App() {
             <div className="venue-footer">
               <button
                 onClick={() =>
-                  setScreen(
-                    "venueHome"
-                  )
+                  setScreen("venueHome")
                 }
               >
                 ⌂
@@ -1308,17 +1661,13 @@ function App() {
 
               <button
                 onClick={() =>
-                  setScreen(
-                    "mostRequested"
-                  )
+                  setScreen("mostRequested")
                 }
               >
                 ♫
               </button>
 
-              <button>
-                ☰
-              </button>
+              <button>☰</button>
             </div>
           </div>
         </section>
@@ -1344,9 +1693,7 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen(
-                    "venues"
-                  )
+                  setScreen("venues")
                 }
               >
                 ←
@@ -1356,7 +1703,13 @@ function App() {
                 DJ LIVE <span>♕</span>
               </div>
 
-              <button className="more-button">
+              <button
+                className="more-button"
+                onClick={() =>
+                  setScreen("djDashboard")
+                }
+                title="DJ Dashboard"
+              >
                 •••
               </button>
             </div>
@@ -1367,13 +1720,10 @@ function App() {
                   LIVE VENUE
                 </p>
 
-                <h2>
-                  Tipsys
-                </h2>
+                <h2>Tipsys</h2>
 
                 <p className="venue-subtext">
-                  Good music. Better
-                  people.
+                  Good music. Better people.
                 </p>
               </div>
 
@@ -1385,23 +1735,17 @@ function App() {
             <section className="now-playing-card">
               <div className="album-art">
                 <div className="album-glow"></div>
-
-                <span>
-                  ♫
-                </span>
+                <span>♫</span>
               </div>
 
               <div className="now-playing-label">
                 NOW PLAYING
               </div>
 
-              <h3>
-                Yeah!
-              </h3>
+              <h3>Yeah!</h3>
 
               <p>
-                Usher · Lil Jon ·
-                Ludacris
+                Usher · Lil Jon · Ludacris
               </p>
 
               <div className="song-progress">
@@ -1409,13 +1753,8 @@ function App() {
               </div>
 
               <div className="song-time">
-                <span>
-                  1:42
-                </span>
-
-                <span>
-                  4:10
-                </span>
+                <span>1:42</span>
+                <span>4:10</span>
               </div>
             </section>
 
@@ -1426,9 +1765,7 @@ function App() {
                     CROWD REACTION
                   </p>
 
-                  <h3>
-                    How's the track?
-                  </h3>
+                  <h3>How's the track?</h3>
                 </div>
 
                 <div className="crowd-score">
@@ -1439,93 +1776,57 @@ function App() {
               <div className="reaction-grid">
                 <button
                   className="reaction-button"
-                  style={reactionStyle(
-                    "fire"
-                  )}
+                  style={reactionStyle("fire")}
                   onClick={() =>
-                    handleReaction(
-                      "fire"
-                    )
+                    handleReaction("fire")
                   }
                 >
-                  <span>
-                    🔥
-                  </span>
+                  <span>🔥</span>
 
                   <small>
-                    Fire ·{" "}
-                    {
-                      crowdVotes.fire
-                    }
+                    Fire · {crowdVotes.fire}
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle(
-                    "good"
-                  )}
+                  style={reactionStyle("good")}
                   onClick={() =>
-                    handleReaction(
-                      "good"
-                    )
+                    handleReaction("good")
                   }
                 >
-                  <span>
-                    👍
-                  </span>
+                  <span>👍</span>
 
                   <small>
-                    Good ·{" "}
-                    {
-                      crowdVotes.good
-                    }
+                    Good · {crowdVotes.good}
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle(
-                    "meh"
-                  )}
+                  style={reactionStyle("meh")}
                   onClick={() =>
-                    handleReaction(
-                      "meh"
-                    )
+                    handleReaction("meh")
                   }
                 >
-                  <span>
-                    😐
-                  </span>
+                  <span>😐</span>
 
                   <small>
-                    Meh ·{" "}
-                    {
-                      crowdVotes.meh
-                    }
+                    Meh · {crowdVotes.meh}
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle(
-                    "skip"
-                  )}
+                  style={reactionStyle("skip")}
                   onClick={() =>
-                    handleReaction(
-                      "skip"
-                    )
+                    handleReaction("skip")
                   }
                 >
-                  <span>
-                    ⏭
-                  </span>
+                  <span>⏭</span>
 
                   <small>
-                    Skip ·{" "}
-                    {
-                      crowdVotes.skip
-                    }
+                    Skip · {crowdVotes.skip}
                   </small>
                 </button>
               </div>
@@ -1534,9 +1835,7 @@ function App() {
             <button
               className="request-song-button"
               onClick={() =>
-                setScreen(
-                  "requestMusic"
-                )
+                setScreen("requestMusic")
               }
             >
               <div>
@@ -1551,8 +1850,8 @@ function App() {
                 </strong>
 
                 <small>
-                  Search music and
-                  send it to the DJ
+                  Search music and send it to
+                  the DJ
                 </small>
               </div>
 
@@ -1563,16 +1862,12 @@ function App() {
 
             <section className="quick-actions-section">
               <div className="section-heading-row">
-                <h3>
-                  Tonight at Tipsys
-                </h3>
+                <h3>Tonight at Tipsys</h3>
 
                 <button
                   className="text-button"
                   onClick={() =>
-                    setScreen(
-                      "mostRequested"
-                    )
+                    setScreen("mostRequested")
                   }
                 >
                   View All
@@ -1583,25 +1878,19 @@ function App() {
                 <button
                   className="quick-action-card"
                   onClick={() =>
-                    setScreen(
-                      "mostRequested"
-                    )
+                    setScreen("mostRequested")
                   }
                 >
-                  <span>
-                    🏆
-                  </span>
+                  <span>🏆</span>
 
                   <strong>
                     Most Requested
                   </strong>
 
                   <small>
-                    {totalRequests >
-                    0
+                    {totalRequests > 0
                       ? `${totalRequests} request${
-                          totalRequests ===
-                          1
+                          totalRequests === 1
                             ? ""
                             : "s"
                         } tonight`
@@ -1610,13 +1899,9 @@ function App() {
                 </button>
 
                 <button className="quick-action-card">
-                  <span>
-                    💬
-                  </span>
+                  <span>💬</span>
 
-                  <strong>
-                    Shoutout
-                  </strong>
+                  <strong>Shoutout</strong>
 
                   <small>
                     Send a message
@@ -1632,9 +1917,7 @@ function App() {
 
               <button
                 onClick={() =>
-                  setScreen(
-                    "requestMusic"
-                  )
+                  setScreen("requestMusic")
                 }
               >
                 ⌕
@@ -1642,15 +1925,17 @@ function App() {
 
               <button
                 onClick={() =>
-                  setScreen(
-                    "mostRequested"
-                  )
+                  setScreen("mostRequested")
                 }
               >
                 ♫
               </button>
 
-              <button>
+              <button
+                onClick={() =>
+                  setScreen("djDashboard")
+                }
+              >
                 ☰
               </button>
             </div>
@@ -1678,9 +1963,7 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen(
-                    "welcome"
-                  )
+                  setScreen("welcome")
                 }
               >
                 ←
@@ -1698,20 +1981,16 @@ function App() {
                 SCAN. REQUEST. VIBE.
               </p>
 
-              <h2>
-                Find Your Venue
-              </h2>
+              <h2>Find Your Venue</h2>
 
               <p>
-                Choose where you're
-                partying tonight.
+                Choose where you're partying
+                tonight.
               </p>
             </div>
 
             <div className="search-box">
-              <span>
-                ⌕
-              </span>
+              <span>⌕</span>
 
               <input
                 type="text"
@@ -1720,9 +1999,7 @@ function App() {
             </div>
 
             <div className="section-title">
-              <span>
-                Nearby Venues
-              </span>
+              <span>Nearby Venues</span>
 
               <span className="live-label">
                 LIVE
@@ -1733,9 +2010,7 @@ function App() {
               <button
                 className="venue-card active-venue"
                 onClick={() =>
-                  setScreen(
-                    "venueHome"
-                  )
+                  setScreen("venueHome")
                 }
               >
                 <div className="venue-image tipsys-image">
@@ -1744,18 +2019,14 @@ function App() {
 
                 <div className="venue-info">
                   <div className="venue-name-row">
-                    <h3>
-                      Tipsys
-                    </h3>
+                    <h3>Tipsys</h3>
 
                     <span className="live-pill">
                       LIVE
                     </span>
                   </div>
 
-                  <p>
-                    0.3 mi · Live Now
-                  </p>
+                  <p>0.3 mi · Live Now</p>
 
                   <span className="venue-type">
                     Bar · Nightlife
@@ -1773,13 +2044,8 @@ function App() {
                 </div>
 
                 <div className="venue-info">
-                  <h3>
-                    The Hideout
-                  </h3>
-
-                  <p>
-                    1.4 mi
-                  </p>
+                  <h3>The Hideout</h3>
+                  <p>1.4 mi</p>
 
                   <span className="venue-type">
                     Bar · Nightlife
@@ -1797,13 +2063,8 @@ function App() {
                 </div>
 
                 <div className="venue-info">
-                  <h3>
-                    Bar 101
-                  </h3>
-
-                  <p>
-                    2.1 mi
-                  </p>
+                  <h3>Bar 101</h3>
+                  <p>2.1 mi</p>
 
                   <span className="venue-type">
                     Bar · Music
@@ -1821,13 +2082,8 @@ function App() {
                 </div>
 
                 <div className="venue-info">
-                  <h3>
-                    Riverside Pub
-                  </h3>
-
-                  <p>
-                    3.5 mi
-                  </p>
+                  <h3>Riverside Pub</h3>
+                  <p>3.5 mi</p>
 
                   <span className="venue-type">
                     Pub · Nightlife
@@ -1845,17 +2101,9 @@ function App() {
                 ⌂
               </button>
 
-              <button>
-                ⌕
-              </button>
-
-              <button>
-                ♫
-              </button>
-
-              <button>
-                ☰
-              </button>
+              <button>⌕</button>
+              <button>♫</button>
+              <button>☰</button>
             </div>
           </div>
         </section>
@@ -1877,9 +2125,7 @@ function App() {
 
         <div className="welcome-content">
           <div className="brand">
-            <h1>
-              DJ LIVE
-            </h1>
+            <h1>DJ LIVE</h1>
 
             <span className="crown">
               ♕
@@ -1900,9 +2146,7 @@ function App() {
             <button
               className="primary-button"
               onClick={() =>
-                setScreen(
-                  "venues"
-                )
+                setScreen("venues")
               }
             >
               ⚡ Continue as Guest
@@ -1914,8 +2158,8 @@ function App() {
           </div>
 
           <p className="no-account">
-            No account required.
-            Just good music.
+            No account required. Just good
+            music.
           </p>
 
           <button className="install-button">
