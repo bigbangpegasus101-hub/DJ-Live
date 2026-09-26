@@ -70,13 +70,30 @@ function App() {
     skip: 1,
   });
 
+  /*
+    Every submitted request is stored here.
+
+    Later this same request data will feed:
+    - DJ request queue
+    - request history
+    - Most Requested
+    - Serato matching
+  */
+  const [requests, setRequests] = useState([]);
+
   const filteredSongs = demoSongs.filter(
     (song) => {
-      const query = search.toLowerCase();
+      const query = search
+        .trim()
+        .toLowerCase();
 
       return (
-        song.title.toLowerCase().includes(query) ||
-        song.artist.toLowerCase().includes(query)
+        song.title
+          .toLowerCase()
+          .includes(query) ||
+        song.artist
+          .toLowerCase()
+          .includes(query)
       );
     }
   );
@@ -97,12 +114,78 @@ function App() {
             100
         );
 
+  /*
+    Build the Most Requested ranking.
+
+    Example:
+    Low requested 3 times
+    Temperature requested 2 times
+
+    becomes:
+    [
+      { song: Low, count: 3 },
+      { song: Temperature, count: 2 }
+    ]
+  */
+  const requestRanking = demoSongs
+    .map((song) => {
+      const songRequests = requests.filter(
+        (request) =>
+          request.song.id === song.id
+      );
+
+      return {
+        song,
+        count: songRequests.length,
+      };
+    })
+    .sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+
+      return a.song.title.localeCompare(
+        b.song.title
+      );
+    });
+
+  const totalRequests = requests.length;
+
   function selectSong(song) {
     setSelectedSong(song);
     setScreen("requestForm");
   }
 
   function submitRequest() {
+    if (!selectedSong) {
+      return;
+    }
+
+    const newRequest = {
+      id:
+        Date.now() +
+        Math.random(),
+
+      song: selectedSong,
+
+      name:
+        requestName.trim() ||
+        "Guest",
+
+      message:
+        requestMessage.trim(),
+
+      submittedAt:
+        new Date().toISOString(),
+
+      status: "pending",
+    };
+
+    setRequests((currentRequests) => [
+      ...currentRequests,
+      newRequest,
+    ]);
+
     setScreen("requestSuccess");
   }
 
@@ -112,6 +195,14 @@ function App() {
     setRequestName("");
     setRequestMessage("");
     setScreen("requestMusic");
+  }
+
+  function returnHome() {
+    setSelectedSong(null);
+    setSearch("");
+    setRequestName("");
+    setRequestMessage("");
+    setScreen("venueHome");
   }
 
   function handleReaction(reaction) {
@@ -125,10 +216,13 @@ function App() {
       };
 
       if (selectedReaction) {
-        updatedVotes[selectedReaction] = Math.max(
-          0,
-          updatedVotes[selectedReaction] - 1
-        );
+        updatedVotes[selectedReaction] =
+          Math.max(
+            0,
+            updatedVotes[
+              selectedReaction
+            ] - 1
+          );
       }
 
       updatedVotes[reaction] =
@@ -141,236 +235,50 @@ function App() {
   }
 
   function reactionStyle(reaction) {
-    if (selectedReaction !== reaction) {
+    if (
+      selectedReaction !== reaction
+    ) {
       return {};
     }
 
     return {
-      borderColor: "rgba(255, 49, 181, 0.9)",
+      borderColor:
+        "rgba(255, 49, 181, 0.9)",
+
       background:
         "linear-gradient(145deg, rgba(255, 28, 172, 0.20), rgba(80, 34, 180, 0.18))",
+
       boxShadow:
         "0 0 18px rgba(255, 49, 181, 0.20)",
-      transform: "translateY(-2px)",
+
+      transform:
+        "translateY(-2px)",
     };
   }
 
-  if (screen === "requestSuccess") {
-    return (
-      <main className="app">
-        <section className="phone-shell request-shell">
-          <div className="glow glow-one"></div>
-          <div className="glow glow-two"></div>
+  function getRankIcon(index) {
+    if (index === 0) {
+      return "🥇";
+    }
 
-          <div className="success-content">
-            <div className="mini-brand">
-              DJ LIVE <span>♕</span>
-            </div>
+    if (index === 1) {
+      return "🥈";
+    }
 
-            <div className="success-icon">
-              ✓
-            </div>
+    if (index === 2) {
+      return "🥉";
+    }
 
-            <p className="eyebrow">
-              REQUEST SENT
-            </p>
-
-            <h2>You're in the queue.</h2>
-
-            <p className="success-copy">
-              Your request was sent to the DJ
-              at Tipsys.
-            </p>
-
-            {selectedSong && (
-              <div className="submitted-song">
-                <div
-                  className={`song-art ${selectedSong.color}`}
-                >
-                  ♫
-                </div>
-
-                <div>
-                  <strong>
-                    {selectedSong.title}
-                  </strong>
-
-                  <span>
-                    {selectedSong.artist}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="success-note">
-              <span>⚡</span>
-
-              <p>
-                Requests aren't guaranteed to
-                play. The DJ controls the final
-                queue.
-              </p>
-            </div>
-
-            <button
-              className="primary-button"
-              onClick={resetRequest}
-            >
-              ＋ Request Another Song
-            </button>
-
-            <button
-              className="secondary-button"
-              onClick={() =>
-                setScreen("venueHome")
-              }
-            >
-              Back to Tipsys
-            </button>
-          </div>
-        </section>
-      </main>
-    );
+    return `#${index + 1}`;
   }
 
-  if (screen === "requestForm") {
-    return (
-      <main className="app">
-        <section className="phone-shell request-shell">
-          <div className="glow glow-one"></div>
-          <div className="glow glow-two"></div>
+  /*
+    =========================
+    MOST REQUESTED
+    =========================
+  */
 
-          <div className="request-page-content">
-            <div className="top-bar">
-              <button
-                className="back-button"
-                onClick={() =>
-                  setScreen("requestMusic")
-                }
-              >
-                ←
-              </button>
-
-              <div className="mini-brand">
-                DJ LIVE <span>♕</span>
-              </div>
-
-              <div className="top-spacer"></div>
-            </div>
-
-            <div className="request-page-heading">
-              <p className="eyebrow">
-                SONG REQUEST
-              </p>
-
-              <h2>Send It</h2>
-
-              <p>
-                This request will be sent to the
-                DJ at Tipsys.
-              </p>
-            </div>
-
-            {selectedSong && (
-              <div className="selected-song-card">
-                <div
-                  className={`song-art large-song-art ${selectedSong.color}`}
-                >
-                  ♫
-                </div>
-
-                <div className="selected-song-info">
-                  <span>
-                    YOUR REQUEST
-                  </span>
-
-                  <h3>
-                    {selectedSong.title}
-                  </h3>
-
-                  <p>
-                    {selectedSong.artist}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="request-form">
-              <label>
-                Your Name
-                <span>OPTIONAL</span>
-              </label>
-
-              <input
-                type="text"
-                placeholder="Who's requesting?"
-                value={requestName}
-                onChange={(event) =>
-                  setRequestName(
-                    event.target.value
-                  )
-                }
-              />
-
-              <label>
-                Message to DJ
-                <span>OPTIONAL</span>
-              </label>
-
-              <textarea
-                placeholder="Birthday, shoutout, please play this next..."
-                maxLength="120"
-                value={requestMessage}
-                onChange={(event) =>
-                  setRequestMessage(
-                    event.target.value
-                  )
-                }
-              />
-
-              <div className="character-count">
-                {requestMessage.length}/120
-              </div>
-
-              <label className="save-song-row">
-                <input type="checkbox" />
-
-                <div>
-                  <strong>
-                    Save this song
-                  </strong>
-
-                  <small>
-                    Add it to your favorites
-                    when signed in.
-                  </small>
-                </div>
-              </label>
-            </div>
-
-            <div className="request-warning">
-              <span>♫</span>
-
-              <p>
-                Sending a request doesn't
-                guarantee it will be played.
-                Your DJ controls the vibe.
-              </p>
-            </div>
-
-            <button
-              className="send-request-button"
-              onClick={submitRequest}
-            >
-              ⚡ Send Request
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (screen === "requestMusic") {
+  if (screen === "mostRequested") {
     return (
       <main className="app">
         <section className="phone-shell request-shell">
@@ -395,29 +303,883 @@ function App() {
               <div className="top-spacer"></div>
             </div>
 
+            <div
+              style={{
+                marginBottom: "22px",
+              }}
+            >
+              <p className="eyebrow">
+                TIPSYS · TONIGHT
+              </p>
+
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "30px",
+                }}
+              >
+                Most Requested
+              </h2>
+
+              <p
+                style={{
+                  margin:
+                    "8px 0 0",
+
+                  color:
+                    "#9199ad",
+
+                  fontSize:
+                    "13px",
+                }}
+              >
+                What the crowd wants
+                to hear tonight.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+
+                gridTemplateColumns:
+                  "1fr 1fr",
+
+                gap: "10px",
+
+                marginBottom:
+                  "22px",
+              }}
+            >
+              <div
+                style={{
+                  padding:
+                    "14px",
+
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+
+                  borderRadius:
+                    "14px",
+
+                  background:
+                    "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color:
+                      "#ff43bd",
+
+                    fontSize:
+                      "23px",
+
+                    fontWeight:
+                      "900",
+                  }}
+                >
+                  {totalRequests}
+                </div>
+
+                <div
+                  style={{
+                    marginTop:
+                      "4px",
+
+                    color:
+                      "#737c91",
+
+                    fontSize:
+                      "8px",
+
+                    fontWeight:
+                      "800",
+
+                    letterSpacing:
+                      "1px",
+                  }}
+                >
+                  TOTAL REQUESTS
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding:
+                    "14px",
+
+                  border:
+                    "1px solid rgba(255,255,255,0.08)",
+
+                  borderRadius:
+                    "14px",
+
+                  background:
+                    "rgba(10,14,25,0.94)",
+                }}
+              >
+                <div
+                  style={{
+                    color:
+                      "#58e5bf",
+
+                    fontSize:
+                      "23px",
+
+                    fontWeight:
+                      "900",
+                  }}
+                >
+                  {
+                    requestRanking.filter(
+                      (item) =>
+                        item.count > 0
+                    ).length
+                  }
+                </div>
+
+                <div
+                  style={{
+                    marginTop:
+                      "4px",
+
+                    color:
+                      "#737c91",
+
+                    fontSize:
+                      "8px",
+
+                    fontWeight:
+                      "800",
+
+                    letterSpacing:
+                      "1px",
+                  }}
+                >
+                  SONGS REQUESTED
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display:
+                  "flex",
+
+                alignItems:
+                  "center",
+
+                justifyContent:
+                  "space-between",
+
+                marginBottom:
+                  "10px",
+              }}
+            >
+              <span
+                style={{
+                  color:
+                    "#dce0ea",
+
+                  fontSize:
+                    "11px",
+
+                  fontWeight:
+                    "800",
+                }}
+              >
+                Tonight's Ranking
+              </span>
+
+              <span
+                style={{
+                  color:
+                    "#70798e",
+
+                  fontSize:
+                    "8px",
+
+                  fontWeight:
+                    "800",
+                }}
+              >
+                LIVE
+              </span>
+            </div>
+
+            <div
+              style={{
+                display:
+                  "grid",
+
+                gap:
+                  "9px",
+              }}
+            >
+              {requestRanking.map(
+                (item, index) => (
+                  <div
+                    key={
+                      item.song.id
+                    }
+                    style={{
+                      display:
+                        "grid",
+
+                      gridTemplateColumns:
+                        "40px 52px 1fr 55px",
+
+                      alignItems:
+                        "center",
+
+                      gap:
+                        "10px",
+
+                      padding:
+                        "10px",
+
+                      border:
+                        item.count >
+                        0
+                          ? "1px solid rgba(255,47,183,0.24)"
+                          : "1px solid rgba(255,255,255,0.07)",
+
+                      borderRadius:
+                        "13px",
+
+                      background:
+                        item.count >
+                        0
+                          ? "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))"
+                          : "rgba(10,14,25,0.90)",
+
+                      opacity:
+                        item.count >
+                        0
+                          ? 1
+                          : 0.55,
+                    }}
+                  >
+                    <div
+                      style={{
+                        textAlign:
+                          "center",
+
+                        fontSize:
+                          index < 3
+                            ? "20px"
+                            : "10px",
+
+                        color:
+                          "#747d91",
+
+                        fontWeight:
+                          "900",
+                      }}
+                    >
+                      {getRankIcon(
+                        index
+                      )}
+                    </div>
+
+                    <div
+                      className={`song-art ${item.song.color}`}
+                    >
+                      ♫
+                    </div>
+
+                    <div
+                      style={{
+                        minWidth:
+                          0,
+
+                        display:
+                          "flex",
+
+                        flexDirection:
+                          "column",
+
+                        gap:
+                          "3px",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          overflow:
+                            "hidden",
+
+                          textOverflow:
+                            "ellipsis",
+
+                          whiteSpace:
+                            "nowrap",
+
+                          fontSize:
+                            "11px",
+                        }}
+                      >
+                        {
+                          item.song
+                            .title
+                        }
+                      </strong>
+
+                      <span
+                        style={{
+                          overflow:
+                            "hidden",
+
+                          textOverflow:
+                            "ellipsis",
+
+                          whiteSpace:
+                            "nowrap",
+
+                          color:
+                            "#8992a6",
+
+                          fontSize:
+                            "8px",
+                        }}
+                      >
+                        {
+                          item.song
+                            .artist
+                        }
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        textAlign:
+                          "right",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          display:
+                            "block",
+
+                          color:
+                            item.count >
+                            0
+                              ? "#ff47bf"
+                              : "#646d81",
+
+                          fontSize:
+                            "16px",
+                        }}
+                      >
+                        {
+                          item.count
+                        }
+                      </strong>
+
+                      <span
+                        style={{
+                          color:
+                            "#687185",
+
+                          fontSize:
+                            "7px",
+                        }}
+                      >
+                        {item.count ===
+                        1
+                          ? "REQUEST"
+                          : "REQUESTS"}
+                      </span>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            {totalRequests === 0 && (
+              <div
+                style={{
+                  marginTop:
+                    "18px",
+
+                  padding:
+                    "14px",
+
+                  borderRadius:
+                    "12px",
+
+                  textAlign:
+                    "center",
+
+                  background:
+                    "rgba(255,255,255,0.03)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize:
+                      "22px",
+                  }}
+                >
+                  🎧
+                </div>
+
+                <strong
+                  style={{
+                    display:
+                      "block",
+
+                    marginTop:
+                      "6px",
+
+                    fontSize:
+                      "11px",
+                  }}
+                >
+                  No requests yet
+                </strong>
+
+                <p
+                  style={{
+                    margin:
+                      "4px 0 0",
+
+                    color:
+                      "#747d91",
+
+                    fontSize:
+                      "8px",
+                  }}
+                >
+                  Be the first to
+                  request something.
+                </p>
+              </div>
+            )}
+
+            <button
+              className="request-song-button"
+              style={{
+                marginTop:
+                  "20px",
+              }}
+              onClick={() =>
+                setScreen(
+                  "requestMusic"
+                )
+              }
+            >
+              <div>
+                <span className="request-icon">
+                  ＋
+                </span>
+              </div>
+
+              <div className="request-button-text">
+                <strong>
+                  Request a Song
+                </strong>
+
+                <small>
+                  Add your vote to
+                  tonight's music
+                </small>
+              </div>
+
+              <span className="request-arrow">
+                ›
+              </span>
+            </button>
+
+            <div className="venue-footer">
+              <button
+                onClick={() =>
+                  setScreen(
+                    "venueHome"
+                  )
+                }
+              >
+                ⌂
+              </button>
+
+              <button
+                onClick={() =>
+                  setScreen(
+                    "requestMusic"
+                  )
+                }
+              >
+                ⌕
+              </button>
+
+              <button className="footer-active">
+                ♫
+              </button>
+
+              <button>
+                ☰
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  /*
+    =========================
+    REQUEST SUCCESS
+    =========================
+  */
+
+  if (screen === "requestSuccess") {
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="success-content">
+            <div className="mini-brand">
+              DJ LIVE <span>♕</span>
+            </div>
+
+            <div className="success-icon">
+              ✓
+            </div>
+
+            <p className="eyebrow">
+              REQUEST SENT
+            </p>
+
+            <h2>
+              You're in the queue.
+            </h2>
+
+            <p className="success-copy">
+              Your request was sent
+              to the DJ at Tipsys.
+            </p>
+
+            {selectedSong && (
+              <div className="submitted-song">
+                <div
+                  className={`song-art ${selectedSong.color}`}
+                >
+                  ♫
+                </div>
+
+                <div>
+                  <strong>
+                    {
+                      selectedSong.title
+                    }
+                  </strong>
+
+                  <span>
+                    {
+                      selectedSong.artist
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="success-note">
+              <span>⚡</span>
+
+              <p>
+                Requests aren't
+                guaranteed to play.
+                The DJ controls the
+                final queue.
+              </p>
+            </div>
+
+            <button
+              className="primary-button"
+              onClick={
+                resetRequest
+              }
+            >
+              ＋ Request Another Song
+            </button>
+
+            <button
+              className="secondary-button"
+              onClick={() =>
+                setScreen(
+                  "mostRequested"
+                )
+              }
+              style={{
+                marginTop:
+                  "10px",
+              }}
+            >
+              🏆 View Most Requested
+            </button>
+
+            <button
+              className="install-button"
+              onClick={
+                returnHome
+              }
+              style={{
+                marginTop:
+                  "10px",
+              }}
+            >
+              Back to Tipsys
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  /*
+    =========================
+    REQUEST FORM
+    =========================
+  */
+
+  if (screen === "requestForm") {
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="request-page-content">
+            <div className="top-bar">
+              <button
+                className="back-button"
+                onClick={() =>
+                  setScreen(
+                    "requestMusic"
+                  )
+                }
+              >
+                ←
+              </button>
+
+              <div className="mini-brand">
+                DJ LIVE <span>♕</span>
+              </div>
+
+              <div className="top-spacer"></div>
+            </div>
+
+            <div className="request-page-heading">
+              <p className="eyebrow">
+                SONG REQUEST
+              </p>
+
+              <h2>
+                Send It
+              </h2>
+
+              <p>
+                This request will be
+                sent to the DJ at
+                Tipsys.
+              </p>
+            </div>
+
+            {selectedSong && (
+              <div className="selected-song-card">
+                <div
+                  className={`song-art large-song-art ${selectedSong.color}`}
+                >
+                  ♫
+                </div>
+
+                <div className="selected-song-info">
+                  <span>
+                    YOUR REQUEST
+                  </span>
+
+                  <h3>
+                    {
+                      selectedSong.title
+                    }
+                  </h3>
+
+                  <p>
+                    {
+                      selectedSong.artist
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="request-form">
+              <label>
+                Your Name
+                <span>
+                  OPTIONAL
+                </span>
+              </label>
+
+              <input
+                type="text"
+                placeholder="Who's requesting?"
+                value={
+                  requestName
+                }
+                onChange={(
+                  event
+                ) =>
+                  setRequestName(
+                    event.target
+                      .value
+                  )
+                }
+              />
+
+              <label>
+                Message to DJ
+                <span>
+                  OPTIONAL
+                </span>
+              </label>
+
+              <textarea
+                placeholder="Birthday, shoutout, please play this next..."
+                maxLength="120"
+                value={
+                  requestMessage
+                }
+                onChange={(
+                  event
+                ) =>
+                  setRequestMessage(
+                    event.target
+                      .value
+                  )
+                }
+              />
+
+              <div className="character-count">
+                {
+                  requestMessage.length
+                }
+                /120
+              </div>
+
+              <label className="save-song-row">
+                <input
+                  type="checkbox"
+                />
+
+                <div>
+                  <strong>
+                    Save this song
+                  </strong>
+
+                  <small>
+                    Add it to your
+                    favorites when
+                    signed in.
+                  </small>
+                </div>
+              </label>
+            </div>
+
+            <div className="request-warning">
+              <span>
+                ♫
+              </span>
+
+              <p>
+                Sending a request
+                doesn't guarantee it
+                will be played. Your
+                DJ controls the vibe.
+              </p>
+            </div>
+
+            <button
+              className="send-request-button"
+              onClick={
+                submitRequest
+              }
+            >
+              ⚡ Send Request
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  /*
+    =========================
+    REQUEST MUSIC
+    =========================
+  */
+
+  if (screen === "requestMusic") {
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="request-page-content">
+            <div className="top-bar">
+              <button
+                className="back-button"
+                onClick={() =>
+                  setScreen(
+                    "venueHome"
+                  )
+                }
+              >
+                ←
+              </button>
+
+              <div className="mini-brand">
+                DJ LIVE <span>♕</span>
+              </div>
+
+              <div className="top-spacer"></div>
+            </div>
+
             <div className="request-page-heading">
               <p className="eyebrow">
                 TIPSYS · LIVE
               </p>
 
-              <h2>Request Music</h2>
+              <h2>
+                Request Music
+              </h2>
 
               <p>
-                Search for the song you want
-                to hear tonight.
+                Search for the song
+                you want to hear
+                tonight.
               </p>
             </div>
 
             <div className="music-search">
-              <span>⌕</span>
+              <span>
+                ⌕
+              </span>
 
               <input
                 type="text"
                 placeholder="Song or artist..."
-                value={search}
-                onChange={(event) =>
+                value={
+                  search
+                }
+                onChange={(
+                  event
+                ) =>
                   setSearch(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 autoFocus
@@ -456,19 +1218,27 @@ function App() {
               </span>
 
               <span>
-                {filteredSongs.length} SONGS
+                {
+                  filteredSongs.length
+                }{" "}
+                SONGS
               </span>
             </div>
 
             <div className="song-results">
-              {filteredSongs.length > 0 ? (
+              {filteredSongs.length >
+              0 ? (
                 filteredSongs.map(
                   (song) => (
                     <button
                       className="song-result"
-                      key={song.id}
+                      key={
+                        song.id
+                      }
                       onClick={() =>
-                        selectSong(song)
+                        selectSong(
+                          song
+                        )
                       }
                     >
                       <div
@@ -479,15 +1249,21 @@ function App() {
 
                       <div className="song-result-info">
                         <strong>
-                          {song.title}
+                          {
+                            song.title
+                          }
                         </strong>
 
                         <span>
-                          {song.artist}
+                          {
+                            song.artist
+                          }
                         </span>
 
                         <small>
-                          {song.album}
+                          {
+                            song.album
+                          }
                         </small>
                       </div>
 
@@ -499,15 +1275,17 @@ function App() {
                 )
               ) : (
                 <div className="no-results">
-                  <span>⌕</span>
+                  <span>
+                    ⌕
+                  </span>
 
                   <h3>
                     No songs found
                   </h3>
 
                   <p>
-                    Try another song title
-                    or artist.
+                    Try another song
+                    title or artist.
                   </p>
                 </div>
               )}
@@ -516,7 +1294,9 @@ function App() {
             <div className="venue-footer">
               <button
                 onClick={() =>
-                  setScreen("venueHome")
+                  setScreen(
+                    "venueHome"
+                  )
                 }
               >
                 ⌂
@@ -526,14 +1306,31 @@ function App() {
                 ⌕
               </button>
 
-              <button>♫</button>
-              <button>☰</button>
+              <button
+                onClick={() =>
+                  setScreen(
+                    "mostRequested"
+                  )
+                }
+              >
+                ♫
+              </button>
+
+              <button>
+                ☰
+              </button>
             </div>
           </div>
         </section>
       </main>
     );
   }
+
+  /*
+    =========================
+    VENUE HOME
+    =========================
+  */
 
   if (screen === "venueHome") {
     return (
@@ -547,7 +1344,9 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen("venues")
+                  setScreen(
+                    "venues"
+                  )
                 }
               >
                 ←
@@ -568,10 +1367,13 @@ function App() {
                   LIVE VENUE
                 </p>
 
-                <h2>Tipsys</h2>
+                <h2>
+                  Tipsys
+                </h2>
 
                 <p className="venue-subtext">
-                  Good music. Better people.
+                  Good music. Better
+                  people.
                 </p>
               </div>
 
@@ -583,17 +1385,23 @@ function App() {
             <section className="now-playing-card">
               <div className="album-art">
                 <div className="album-glow"></div>
-                <span>♫</span>
+
+                <span>
+                  ♫
+                </span>
               </div>
 
               <div className="now-playing-label">
                 NOW PLAYING
               </div>
 
-              <h3>Yeah!</h3>
+              <h3>
+                Yeah!
+              </h3>
 
               <p>
-                Usher · Lil Jon · Ludacris
+                Usher · Lil Jon ·
+                Ludacris
               </p>
 
               <div className="song-progress">
@@ -601,8 +1409,13 @@ function App() {
               </div>
 
               <div className="song-time">
-                <span>1:42</span>
-                <span>4:10</span>
+                <span>
+                  1:42
+                </span>
+
+                <span>
+                  4:10
+                </span>
               </div>
             </section>
 
@@ -626,57 +1439,93 @@ function App() {
               <div className="reaction-grid">
                 <button
                   className="reaction-button"
-                  style={reactionStyle("fire")}
+                  style={reactionStyle(
+                    "fire"
+                  )}
                   onClick={() =>
-                    handleReaction("fire")
+                    handleReaction(
+                      "fire"
+                    )
                   }
                 >
-                  <span>🔥</span>
+                  <span>
+                    🔥
+                  </span>
 
                   <small>
-                    Fire · {crowdVotes.fire}
+                    Fire ·{" "}
+                    {
+                      crowdVotes.fire
+                    }
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle("good")}
+                  style={reactionStyle(
+                    "good"
+                  )}
                   onClick={() =>
-                    handleReaction("good")
+                    handleReaction(
+                      "good"
+                    )
                   }
                 >
-                  <span>👍</span>
+                  <span>
+                    👍
+                  </span>
 
                   <small>
-                    Good · {crowdVotes.good}
+                    Good ·{" "}
+                    {
+                      crowdVotes.good
+                    }
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle("meh")}
+                  style={reactionStyle(
+                    "meh"
+                  )}
                   onClick={() =>
-                    handleReaction("meh")
+                    handleReaction(
+                      "meh"
+                    )
                   }
                 >
-                  <span>😐</span>
+                  <span>
+                    😐
+                  </span>
 
                   <small>
-                    Meh · {crowdVotes.meh}
+                    Meh ·{" "}
+                    {
+                      crowdVotes.meh
+                    }
                   </small>
                 </button>
 
                 <button
                   className="reaction-button"
-                  style={reactionStyle("skip")}
+                  style={reactionStyle(
+                    "skip"
+                  )}
                   onClick={() =>
-                    handleReaction("skip")
+                    handleReaction(
+                      "skip"
+                    )
                   }
                 >
-                  <span>⏭</span>
+                  <span>
+                    ⏭
+                  </span>
 
                   <small>
-                    Skip · {crowdVotes.skip}
+                    Skip ·{" "}
+                    {
+                      crowdVotes.skip
+                    }
                   </small>
                 </button>
               </div>
@@ -685,7 +1534,9 @@ function App() {
             <button
               className="request-song-button"
               onClick={() =>
-                setScreen("requestMusic")
+                setScreen(
+                  "requestMusic"
+                )
               }
             >
               <div>
@@ -700,8 +1551,8 @@ function App() {
                 </strong>
 
                 <small>
-                  Search music and send it
-                  to the DJ
+                  Search music and
+                  send it to the DJ
                 </small>
               </div>
 
@@ -716,26 +1567,52 @@ function App() {
                   Tonight at Tipsys
                 </h3>
 
-                <button className="text-button">
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    setScreen(
+                      "mostRequested"
+                    )
+                  }
+                >
                   View All
                 </button>
               </div>
 
               <div className="quick-action-grid">
-                <button className="quick-action-card">
-                  <span>🏆</span>
+                <button
+                  className="quick-action-card"
+                  onClick={() =>
+                    setScreen(
+                      "mostRequested"
+                    )
+                  }
+                >
+                  <span>
+                    🏆
+                  </span>
 
                   <strong>
                     Most Requested
                   </strong>
 
                   <small>
-                    See what's hot tonight
+                    {totalRequests >
+                    0
+                      ? `${totalRequests} request${
+                          totalRequests ===
+                          1
+                            ? ""
+                            : "s"
+                        } tonight`
+                      : "See what's hot tonight"}
                   </small>
                 </button>
 
                 <button className="quick-action-card">
-                  <span>💬</span>
+                  <span>
+                    💬
+                  </span>
 
                   <strong>
                     Shoutout
@@ -755,20 +1632,39 @@ function App() {
 
               <button
                 onClick={() =>
-                  setScreen("requestMusic")
+                  setScreen(
+                    "requestMusic"
+                  )
                 }
               >
                 ⌕
               </button>
 
-              <button>♫</button>
-              <button>☰</button>
+              <button
+                onClick={() =>
+                  setScreen(
+                    "mostRequested"
+                  )
+                }
+              >
+                ♫
+              </button>
+
+              <button>
+                ☰
+              </button>
             </div>
           </div>
         </section>
       </main>
     );
   }
+
+  /*
+    =========================
+    VENUES
+    =========================
+  */
 
   if (screen === "venues") {
     return (
@@ -782,7 +1678,9 @@ function App() {
               <button
                 className="back-button"
                 onClick={() =>
-                  setScreen("welcome")
+                  setScreen(
+                    "welcome"
+                  )
                 }
               >
                 ←
@@ -805,13 +1703,15 @@ function App() {
               </h2>
 
               <p>
-                Choose where you're partying
-                tonight.
+                Choose where you're
+                partying tonight.
               </p>
             </div>
 
             <div className="search-box">
-              <span>⌕</span>
+              <span>
+                ⌕
+              </span>
 
               <input
                 type="text"
@@ -833,7 +1733,9 @@ function App() {
               <button
                 className="venue-card active-venue"
                 onClick={() =>
-                  setScreen("venueHome")
+                  setScreen(
+                    "venueHome"
+                  )
                 }
               >
                 <div className="venue-image tipsys-image">
@@ -875,7 +1777,9 @@ function App() {
                     The Hideout
                   </h3>
 
-                  <p>1.4 mi</p>
+                  <p>
+                    1.4 mi
+                  </p>
 
                   <span className="venue-type">
                     Bar · Nightlife
@@ -897,7 +1801,9 @@ function App() {
                     Bar 101
                   </h3>
 
-                  <p>2.1 mi</p>
+                  <p>
+                    2.1 mi
+                  </p>
 
                   <span className="venue-type">
                     Bar · Music
@@ -919,7 +1825,9 @@ function App() {
                     Riverside Pub
                   </h3>
 
-                  <p>3.5 mi</p>
+                  <p>
+                    3.5 mi
+                  </p>
 
                   <span className="venue-type">
                     Pub · Nightlife
@@ -937,15 +1845,29 @@ function App() {
                 ⌂
               </button>
 
-              <button>⌕</button>
-              <button>♫</button>
-              <button>☰</button>
+              <button>
+                ⌕
+              </button>
+
+              <button>
+                ♫
+              </button>
+
+              <button>
+                ☰
+              </button>
             </div>
           </div>
         </section>
       </main>
     );
   }
+
+  /*
+    =========================
+    WELCOME
+    =========================
+  */
 
   return (
     <main className="app">
@@ -978,7 +1900,9 @@ function App() {
             <button
               className="primary-button"
               onClick={() =>
-                setScreen("venues")
+                setScreen(
+                  "venues"
+                )
               }
             >
               ⚡ Continue as Guest
@@ -990,8 +1914,8 @@ function App() {
           </div>
 
           <p className="no-account">
-            No account required. Just good
-            music.
+            No account required.
+            Just good music.
           </p>
 
           <button className="install-button">
