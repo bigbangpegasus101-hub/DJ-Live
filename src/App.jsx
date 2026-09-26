@@ -46,157 +46,131 @@
                 color: "green",
               },
             ];
+const STORAGE_KEYS = {
+  guestId: "djLive.guestId.v1",
+  guestRequestIds: "djLive.guestRequestIds.v1",
+  crowdVotes: "djLive.crowdVotes.v1",
+  selectedReaction: "djLive.selectedReaction.v1",
+};
 
-            const STORAGE_KEYS = {
-              requests: "djLive.requests.v1",
-              crowdVotes: "djLive.crowdVotes.v1",
-              selectedReaction: "djLive.selectedReaction.v1",
-            };
+const DEFAULT_CROWD_VOTES = {
+  fire: 38,
+  good: 17,
+  meh: 3,
+  skip: 1,
+};
 
-            const DEFAULT_CROWD_VOTES = {
-              fire: 38,
-              good: 17,
-              meh: 3,
-              skip: 1,
-            };
+function readStoredValue(key, fallbackValue) {
+  try {
+    const storedValue = localStorage.getItem(key);
+    if (storedValue === null) return fallbackValue;
+    return JSON.parse(storedValue);
+  } catch (error) {
+    console.warn(`DJ Live could not read ${key} from localStorage.`, error);
+    return fallbackValue;
+  }
+}
 
-            function readStoredValue(key, fallbackValue) {
-              try {
-                const storedValue = localStorage.getItem(key);
+function writeStoredValue(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`DJ Live could not save ${key} to localStorage.`, error);
+  }
+}
 
-                if (storedValue === null) {
-                  return fallbackValue;
-                }
+function getOrCreateGuestId() {
+  const existingGuestId = readStoredValue(STORAGE_KEYS.guestId, null);
 
-                return JSON.parse(storedValue);
-              } catch (error) {
-                console.warn(`DJ Live could not read ${key} from localStorage.`, error);
-                return fallbackValue;
-              }
-            }
+  if (typeof existingGuestId === "string" && existingGuestId.trim()) {
+    return existingGuestId;
+  }
 
-            function writeStoredValue(key, value) {
-              try {
-                localStorage.setItem(key, JSON.stringify(value));
-              } catch (error) {
-                console.warn(`DJ Live could not save ${key} to localStorage.`, error);
-              }
-            }
+  const newGuestId = `guest-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+  writeStoredValue(STORAGE_KEYS.guestId, newGuestId);
+  return newGuestId;
+}
 
-            function App() {
-              const [screen, setScreen] = useState("welcome");
-              const [search, setSearch] = useState("");
-              const [selectedSong, setSelectedSong] = useState(null);
-              const [requestName, setRequestName] = useState("");
-              const [requestMessage, setRequestMessage] = useState("");
+function App() {
+  const [screen, setScreen] = useState("welcome");
+  const [search, setSearch] = useState("");
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [requestName, setRequestName] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requests, setRequests] = useState([]);
+  const [serverReady, setServerReady] = useState(false);
+  const [lastSubmittedRequestId, setLastSubmittedRequestId] = useState(null);
 
-              const [selectedReaction, setSelectedReaction] = useState(() =>
-                readStoredValue(STORAGE_KEYS.selectedReaction, null)
-              );
+  const [guestId] = useState(() => getOrCreateGuestId());
 
-              const [crowdVotes, setCrowdVotes] = useState(() =>
-                readStoredValue(STORAGE_KEYS.crowdVotes, DEFAULT_CROWD_VOTES)
-              );
+  const [guestRequestIds, setGuestRequestIds] = useState(() =>
+    readStoredValue(STORAGE_KEYS.guestRequestIds, [])
+  );
 
-              const [requests, setRequests] = useState(() =>
-                readStoredValue(STORAGE_KEYS.requests, [])
-              );
+  const [selectedReaction, setSelectedReaction] = useState(() =>
+    readStoredValue(STORAGE_KEYS.selectedReaction, null)
+  );
 
-              useEffect(() => {
-                writeStoredValue(STORAGE_KEYS.requests, requests);
-              }, [requests]);
+  const [crowdVotes, setCrowdVotes] = useState(() =>
+    readStoredValue(STORAGE_KEYS.crowdVotes, DEFAULT_CROWD_VOTES)
+  );
 
-              useEffect(() => {
-                writeStoredValue(STORAGE_KEYS.crowdVotes, crowdVotes);
-              }, [crowdVotes]);
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.guestRequestIds, guestRequestIds);
+  }, [guestRequestIds]);
 
-              useEffect(() => {
-                writeStoredValue(
-                  STORAGE_KEYS.selectedReaction,
-                  selectedReaction
-                );
-              }, [selectedReaction]);
-              useEffect(() => {
-                function handleRealtimeRequest(incomingRequest) {
-                  setRequests((currentRequests) => {
-                    const requestAlreadyExists = currentRequests.some(
-                      (request) => request.id === incomingRequest.id
-                    );
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.crowdVotes, crowdVotes);
+  }, [crowdVotes]);
 
-                    if (requestAlreadyExists) {
-                      return currentRequests;
-                    }
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.selectedReaction, selectedReaction);
+  }, [selectedReaction]);
 
-                    return [...currentRequests, incomingRequest];
-                  });
-                }
+  useEffect(() => {
+    function handleServerState(state) {
+      const serverRequests = Array.isArray(state?.requests)
+        ? state.requests
+        : [];
 
-                socket.on("song-request", handleRealtimeRequest);
+      setRequests(serverRequests);
 
-                return () => {
-                  socket.off("song-request", handleRealtimeRequest);
-                };
-              }, []);
+      const ownedRequestIds = serverRequests
+        .filter((request) => request.guestId === guestId)
+        .map((request) => request.id);
 
+      if (ownedRequestIds.length > 0) {
+        setGuestRequestIds((currentIds) => [
+          ...new Set([...currentIds, ...ownedRequestIds]),
+        ]);
+      }
 
-              useEffect(() => {
-                function handleRequestStatusUpdate(updatedRequest) {
-                  setRequests((currentRequests) =>
-                    currentRequests.map((request) =>
-                      request.id === updatedRequest.id
-                        ? updatedRequest
-                        : request
-                    )
-                  );
-                }
+      setServerReady(true);
+    }
 
-                socket.on(
-                  "request-status-update",
-                  handleRequestStatusUpdate
-                );
+    function handleConnect() {
+      setServerReady(false);
+      socket.emit("state-request");
+    }
 
-                return () => {
-                  socket.off(
-                    "request-status-update",
-                    handleRequestStatusUpdate
-                  );
-                };
-              }, []);
+    function handleDisconnect() {
+      setServerReady(false);
+    }
 
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("server-state", handleServerState);
 
-              useEffect(() => {
-                function handleRequestsBatchUpdate(updatedRequests) {
-                  setRequests((currentRequests) => {
-                    const updatesById = new Map(
-                      updatedRequests.map((request) => [
-                        request.id,
-                        request,
-                      ])
-                    );
+    if (socket.connected) handleConnect();
 
-                    return currentRequests.map((request) =>
-                      updatesById.has(request.id)
-                        ? updatesById.get(request.id)
-                        : request
-                    );
-                  });
-                }
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("server-state", handleServerState);
+    };
+  }, []);
 
-                socket.on(
-                  "requests-batch-update",
-                  handleRequestsBatchUpdate
-                );
-
-                return () => {
-                  socket.off(
-                    "requests-batch-update",
-                    handleRequestsBatchUpdate
-                  );
-                };
-              }, []);
-
-
-              const filteredSongs = demoSongs.filter((song) => {
+  const filteredSongs = demoSongs.filter((song) => {
                 const query = search.trim().toLowerCase();
 
                 return (
@@ -272,34 +246,35 @@
                 setSelectedSong(song);
                 setScreen("requestForm");
               }
+  function submitRequest() {
+    if (!selectedSong) return;
 
-              function submitRequest() {
-                if (!selectedSong) return;
+    const newRequest = {
+      id: `${Date.now()}-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
+      guestId,
+      song: selectedSong,
+      name: requestName.trim() || "Guest",
+      message: requestMessage.trim(),
+      submittedAt: new Date().toISOString(),
+      status: "pending",
+      queuePosition: null,
+      deck: null,
+      loadedAt: null,
+      playedAt: null,
+    };
 
-                const newRequest = {
-                  id: Date.now() + Math.random(),
-                  song: selectedSong,
-                  name: requestName.trim() || "Guest",
-                  message: requestMessage.trim(),
-                  submittedAt: new Date().toISOString(),
-                  status: "pending",
-                  queuePosition: null,
-                  deck: null,
-                  loadedAt: null,
-                  playedAt: null,
-                };
+    setGuestRequestIds((currentIds) =>
+      currentIds.includes(newRequest.id)
+        ? currentIds
+        : [...currentIds, newRequest.id]
+    );
 
-                setRequests((currentRequests) => [
-                  ...currentRequests,
-                  newRequest,
-                ]);
+    setLastSubmittedRequestId(newRequest.id);
+    socket.emit("request-create", newRequest);
+    setScreen("requestSuccess");
+  }
 
-                socket.emit("song-request", newRequest);
-
-                setScreen("requestSuccess");
-              }
-
-              function resetRequest() {
+  function resetRequest() {
                 setSelectedSong(null);
                 setSearch("");
                 setRequestName("");
@@ -355,337 +330,42 @@
 
                 return `#${index + 1}`;
               }
+  function approveRequest(requestId) {
+    socket.emit("request-action", { type: "approve", requestId });
+  }
 
-              function normalizeQueue(requestList) {
-                const queued = requestList
-                  .filter((request) => request.status === "queued")
-                  .sort(
-                    (a, b) =>
-                      (a.queuePosition ?? 9999) -
-                      (b.queuePosition ?? 9999)
-                  );
+  function declineRequest(requestId) {
+    socket.emit("request-action", { type: "decline", requestId });
+  }
 
-                const queuePositions = new Map();
+  function moveQueueItem(requestId, direction) {
+    socket.emit("request-action", { type: "move", requestId, direction });
+  }
 
-                queued.forEach((request, index) => {
-                  queuePositions.set(request.id, index + 1);
-                });
+  function removeFromQueue(requestId) {
+    socket.emit("request-action", { type: "remove", requestId });
+  }
 
-                return requestList.map((request) => {
-                  if (!queuePositions.has(request.id)) {
-                    return request;
-                  }
+  function loadToDeck(requestId, deckNumber) {
+    socket.emit("request-action", {
+      type: "load",
+      requestId,
+      deckNumber,
+    });
+  }
 
-                  return {
-                    ...request,
-                    queuePosition: queuePositions.get(request.id),
-                  };
-                });
-              }
+  function returnLoadedToQueue(requestId) {
+    socket.emit("request-action", {
+      type: "return-to-queue",
+      requestId,
+    });
+  }
 
-              function approveRequest(requestId) {
-                setRequests((currentRequests) => {
-                  const currentQueue = currentRequests.filter(
-                    (request) => request.status === "queued"
-                  );
+  function markPlayed(requestId) {
+    socket.emit("request-action", { type: "played", requestId });
+  }
 
-                  const nextQueuePosition =
-                    currentQueue.length === 0
-                      ? 1
-                      : Math.max(
-                          ...currentQueue.map(
-                            (request) => request.queuePosition ?? 0
-                          )
-                        ) + 1;
-
-                  let updatedRequest = null;
-
-                  const updatedRequests = currentRequests.map(
-                    (request) => {
-                      if (request.id !== requestId) {
-                        return request;
-                      }
-
-                      updatedRequest = {
-                        ...request,
-                        status: "queued",
-                        queuePosition: nextQueuePosition,
-                      };
-
-                      return updatedRequest;
-                    }
-                  );
-
-                  if (updatedRequest) {
-                    socket.emit(
-                      "request-status-update",
-                      updatedRequest
-                    );
-                  }
-
-                  return updatedRequests;
-                });
-              }
-
-              function declineRequest(requestId) {
-                setRequests((currentRequests) => {
-                  let updatedRequest = null;
-
-                  const updatedRequests = currentRequests.map(
-                    (request) => {
-                      if (request.id !== requestId) {
-                        return request;
-                      }
-
-                      updatedRequest = {
-                        ...request,
-                        status: "declined",
-                        queuePosition: null,
-                        deck: null,
-                      };
-
-                      return updatedRequest;
-                    }
-                  );
-
-                  if (updatedRequest) {
-                    socket.emit(
-                      "request-status-update",
-                      updatedRequest
-                    );
-                  }
-
-                  return updatedRequests;
-                });
-              }
-
-              function moveQueueItem(requestId, direction) {
-                setRequests((currentRequests) => {
-                  const queue = currentRequests
-                    .filter((request) => request.status === "queued")
-                    .sort(
-                      (a, b) =>
-                        (a.queuePosition ?? 9999) -
-                        (b.queuePosition ?? 9999)
-                    );
-
-                  const currentIndex = queue.findIndex(
-                    (request) => request.id === requestId
-                  );
-
-                  if (currentIndex === -1) {
-                    return currentRequests;
-                  }
-
-                  const targetIndex =
-                    direction === "up"
-                      ? currentIndex - 1
-                      : currentIndex + 1;
-
-                  if (
-                    targetIndex < 0 ||
-                    targetIndex >= queue.length
-                  ) {
-                    return currentRequests;
-                  }
-
-                  const currentItem = queue[currentIndex];
-                  const targetItem = queue[targetIndex];
-
-                  const updatedRequests = normalizeQueue(
-                    currentRequests.map((request) => {
-                      if (request.id === currentItem.id) {
-                        return {
-                          ...request,
-                          queuePosition: targetItem.queuePosition,
-                        };
-                      }
-
-                      if (request.id === targetItem.id) {
-                        return {
-                          ...request,
-                          queuePosition: currentItem.queuePosition,
-                        };
-                      }
-
-                      return request;
-                    })
-                  );
-
-                  socket.emit(
-                    "requests-batch-update",
-                    updatedRequests
-                  );
-
-                  return updatedRequests;
-                });
-              }
-
-              function removeFromQueue(requestId) {
-                setRequests((currentRequests) => {
-                  const updatedRequests = normalizeQueue(
-                    currentRequests.map((request) =>
-                      request.id === requestId
-                        ? {
-                            ...request,
-                            status: "declined",
-                            queuePosition: null,
-                            deck: null,
-                          }
-                        : request
-                    )
-                  );
-
-                  socket.emit(
-                    "requests-batch-update",
-                    updatedRequests
-                  );
-
-                  return updatedRequests;
-                });
-              }
-
-              function loadToDeck(requestId, deckNumber) {
-                setRequests((currentRequests) => {
-                  /*
-                    Manual V1 test harness for the future Serato bridge.
-                    One requested track can occupy each deck.
-                    If another requested track is already loaded on this
-                    deck, return it to the front of the queue.
-                  */
-
-                  const targetRequest = currentRequests.find(
-                    (request) => request.id === requestId
-                  );
-
-                  if (!targetRequest) {
-                    return currentRequests;
-                  }
-
-                  const currentQueue = currentRequests
-                    .filter(
-                      (request) =>
-                        request.status === "queued" &&
-                        request.id !== requestId
-                    )
-                    .sort(
-                      (a, b) =>
-                        (a.queuePosition ?? 9999) -
-                        (b.queuePosition ?? 9999)
-                    );
-
-                  const updatedRequests = normalizeQueue(
-                    currentRequests.map((request) => {
-                      if (
-                        request.status === "loaded" &&
-                        request.deck === deckNumber &&
-                        request.id !== requestId
-                      ) {
-                        return {
-                          ...request,
-                          status: "queued",
-                          queuePosition: 1,
-                          deck: null,
-                          loadedAt: null,
-                        };
-                      }
-
-                      if (request.id === requestId) {
-                        return {
-                          ...request,
-                          status: "loaded",
-                          queuePosition: null,
-                          deck: deckNumber,
-                          loadedAt: new Date().toISOString(),
-                        };
-                      }
-
-                      if (
-                        request.status === "queued" &&
-                        currentQueue.some(
-                          (queuedRequest) =>
-                            queuedRequest.id === request.id
-                        )
-                      ) {
-                        return {
-                          ...request,
-                          queuePosition:
-                            (request.queuePosition ?? 0) + 1,
-                        };
-                      }
-
-                      return request;
-                    })
-                  );
-
-                  socket.emit(
-                    "requests-batch-update",
-                    updatedRequests
-                  );
-
-                  return updatedRequests;
-                });
-              }
-
-              function returnLoadedToQueue(requestId) {
-                setRequests((currentRequests) => {
-                  const updatedRequests = normalizeQueue(
-                    currentRequests.map((request) => {
-                      if (request.id === requestId) {
-                        return {
-                          ...request,
-                          status: "queued",
-                          queuePosition: 1,
-                          deck: null,
-                          loadedAt: null,
-                        };
-                      }
-
-                      if (request.status === "queued") {
-                        return {
-                          ...request,
-                          queuePosition:
-                            (request.queuePosition ?? 0) + 1,
-                        };
-                      }
-
-                      return request;
-                    })
-                  );
-
-                  socket.emit(
-                    "requests-batch-update",
-                    updatedRequests
-                  );
-
-                  return updatedRequests;
-                });
-              }
-
-              function markPlayed(requestId) {
-                setRequests((currentRequests) => {
-                  const updatedRequests = currentRequests.map(
-                    (request) =>
-                      request.id === requestId
-                        ? {
-                            ...request,
-                            status: "played",
-                            queuePosition: null,
-                            playedAt: new Date().toISOString(),
-                          }
-                        : request
-                  );
-
-                  socket.emit(
-                    "requests-batch-update",
-                    updatedRequests
-                  );
-
-                  return updatedRequests;
-                });
-              }
-
-              function formatRequestTime(timestamp) {
+  function formatRequestTime(timestamp) {
                 if (!timestamp) return "";
 
                 return new Date(timestamp).toLocaleTimeString([], {
@@ -693,6 +373,171 @@
                   minute: "2-digit",
                 });
               }
+  const myRequests = requests
+    .filter(
+      (request) =>
+        request.guestId === guestId ||
+        guestRequestIds.includes(request.id)
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0)
+    );
+
+  function requestStatusText(request) {
+    if (request.status === "pending") return "Waiting for DJ";
+    if (request.status === "queued") {
+      return `Approved · Queue #${request.queuePosition ?? "?"}`;
+    }
+    if (request.status === "loaded") {
+      return `Loaded · Deck ${request.deck ?? "?"}`;
+    }
+    if (request.status === "played") return "Played ✓";
+    if (request.status === "declined") return "Declined";
+    return request.status;
+  }
+
+  if (screen === "myRequests") {
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="request-page-content">
+            <div className="top-bar">
+              <button
+                className="back-button"
+                onClick={() => setScreen("venueHome")}
+              >
+                ←
+              </button>
+
+              <div className="mini-brand">
+                DJ LIVE <span>♕</span>
+              </div>
+
+              <div className="top-spacer"></div>
+            </div>
+
+            <div style={{ marginBottom: "22px" }}>
+              <p className="eyebrow">TIPSYS · LIVE STATUS</p>
+              <h2 style={{ margin: 0, fontSize: "30px" }}>
+                My Requests
+              </h2>
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  color: "#9199ad",
+                  fontSize: "13px",
+                }}
+              >
+                Your request status updates live as the DJ handles it.
+              </p>
+            </div>
+
+            {!serverReady && (
+              <div className="success-note" style={{ marginBottom: "12px" }}>
+                <span>↻</span>
+                <p>Reconnecting and syncing the latest DJ Live state...</p>
+              </div>
+            )}
+
+            {myRequests.length === 0 ? (
+              <EmptyDashboardCard
+                icon="♫"
+                title="No requests yet"
+                text="Request a song and its live status will show here."
+              />
+            ) : (
+              <div style={{ display: "grid", gap: "10px" }}>
+                {myRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    style={{
+                      padding: "14px",
+                      border: "1px solid rgba(255,47,183,0.20)",
+                      borderRadius: "15px",
+                      background:
+                        "linear-gradient(90deg, rgba(255,24,172,0.06), rgba(10,14,25,0.96))",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "11px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div
+                        className={`song-art ${request.song.color}`}
+                        style={{ width: "52px", height: "52px" }}
+                      >
+                        ♫
+                      </div>
+
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <strong
+                          style={{ display: "block", fontSize: "12px" }}
+                        >
+                          {request.song.title}
+                        </strong>
+
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: "3px",
+                            color: "#8992a6",
+                            fontSize: "8px",
+                          }}
+                        >
+                          {request.song.artist}
+                        </span>
+
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: "7px",
+                            color:
+                              request.status === "declined"
+                                ? "#ff657d"
+                                : request.status === "played"
+                                  ? "#58e5bf"
+                                  : "#ff47bf",
+                            fontSize: "9px",
+                            fontWeight: 900,
+                          }}
+                        >
+                          {requestStatusText(request)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className="primary-button"
+              style={{ marginTop: "18px" }}
+              onClick={() => setScreen("requestMusic")}
+            >
+              ＋ Request Another Song
+            </button>
+
+            <button
+              className="secondary-button"
+              style={{ marginTop: "10px" }}
+              onClick={() => setScreen("venueHome")}
+            >
+              Back to Tipsys
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
 
               /*
                 =========================
@@ -1656,6 +1501,21 @@
                           Tipsys.
                         </p>
 
+                        {lastSubmittedRequestId && (
+                          <p
+                            style={{
+                              margin: "-8px 0 14px",
+                              color: serverReady ? "#58e5bf" : "#9199ad",
+                              fontSize: "9px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {serverReady
+                              ? "✓ Synced with DJ Live"
+                              : "↻ Syncing with DJ Live..."}
+                          </p>
+                        )}
+
                         {selectedSong && (
                           <div className="submitted-song">
                             <div
@@ -1690,6 +1550,14 @@
                           onClick={resetRequest}
                         >
                           ＋ Request Another Song
+                        </button>
+
+                        <button
+                          className="secondary-button"
+                          onClick={() => setScreen("myRequests")}
+                          style={{ marginTop: "10px" }}
+                        >
+                          ⚡ View Live Request Status
                         </button>
 
                         <button
@@ -2203,10 +2071,13 @@
                               </small>
                             </button>
 
-                            <button className="quick-action-card">
-                              <span>💬</span>
-                              <strong>Shoutout</strong>
-                              <small>Send a message</small>
+                            <button
+                              className="quick-action-card"
+                              onClick={() => setScreen("myRequests")}
+                            >
+                              <span>⚡</span>
+                              <strong>My Requests</strong>
+                              <small>Track your live status</small>
                             </button>
                           </div>
                         </section>
