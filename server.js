@@ -833,17 +833,16 @@ function applySeratoLoadedTrack({ deck, title, artist }) {
   };
 }
 
-// Local-only receiving endpoint for the upcoming Serato companion.
-// The browser cannot call this from another device on the LAN.
+// Authenticated receiving endpoint for the Serato companion.
 app.post("/api/serato/loaded", (req, res) => {
-  const remote = req.socket.remoteAddress || "";
-  const isLocal =
-    remote === "127.0.0.1" ||
-    remote === "::1" ||
-    remote === "::ffff:127.0.0.1";
+  const configuredToken = process.env.SERATO_BRIDGE_TOKEN || "";
+  const providedToken = req.get("x-serato-bridge-token") || "";
 
-  if (!isLocal) {
-    return res.status(403).json({ ok: false, message: "Local bridge only." });
+  if (!configuredToken || providedToken !== configuredToken) {
+    return res.status(403).json({
+      ok: false,
+      message: "Serato bridge authentication failed.",
+    });
   }
 
   const result = applySeratoLoadedTrack(req.body || {});
