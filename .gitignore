@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 # DJ Live local server state
 data/
+.env

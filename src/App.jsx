@@ -51,6 +51,7 @@ const STORAGE_KEYS = {
   guestRequestIds: "djLive.guestRequestIds.v1",
   crowdVotes: "djLive.crowdVotes.v1",
   selectedReaction: "djLive.selectedReaction.v1",
+  djToken: "djLive.djToken.v4",
 };
 
 const DEFAULT_CROWD_VOTES = {
@@ -99,7 +100,35 @@ function App() {
   const [requestMessage, setRequestMessage] = useState("");
   const [requests, setRequests] = useState([]);
   const [serverReady, setServerReady] = useState(false);
+  const [spotifySongs, setSpotifySongs] = useState([]);
+  const [spotifySearching, setSpotifySearching] = useState(false);
+  const [spotifyError, setSpotifyError] = useState("");
+  const [savedSongs, setSavedSongs] = useState(() =>
+    readStoredValue(STORAGE_KEYS.savedSongs, [])
+  );
+
+  const [session, setSession] = useState({
+    isLive: false,
+    sessionId: null,
+    startedAt: null,
+    endsAt: null,
+    endedAt: null,
+    endReason: null,
+  });
   const [lastSubmittedRequestId, setLastSubmittedRequestId] = useState(null);
+  const [djToken, setDjToken] = useState(() =>
+    readStoredValue(STORAGE_KEYS.djToken, null)
+  );
+  const [djUser, setDjUser] = useState(null);
+  const [djUsername, setDjUsername] = useState("");
+  const [djPassword, setDjPassword] = useState("");
+  const [djDisplayName, setDjDisplayName] = useState("");
+  const [djCurrentPassword, setDjCurrentPassword] = useState("");
+  const [djNewPassword, setDjNewPassword] = useState("");
+  const [djLoginError, setDjLoginError] = useState("");
+  const [djAccountMessage, setDjAccountMessage] = useState("");
+  const [djLoginBusy, setDjLoginBusy] = useState(false);
+  const [requestRuleMessage, setRequestRuleMessage] = useState("");
 
   const [guestId] = useState(() => getOrCreateGuestId());
 
@@ -128,12 +157,24 @@ function App() {
   }, [selectedReaction]);
 
   useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.savedSongs, savedSongs);
+  }, [savedSongs]);
+
+  useEffect(() => {
     function handleServerState(state) {
       const serverRequests = Array.isArray(state?.requests)
         ? state.requests
         : [];
 
       setRequests(serverRequests);
+      setSession({
+        isLive: Boolean(state?.session?.isLive),
+        sessionId: state?.session?.sessionId ?? null,
+        startedAt: state?.session?.startedAt ?? null,
+        endsAt: state?.session?.endsAt ?? null,
+        endedAt: state?.session?.endedAt ?? null,
+        endReason: state?.session?.endReason ?? null,
+      });
 
       const ownedRequestIds = serverRequests
         .filter((request) => request.guestId === guestId)
@@ -157,27 +198,189 @@ function App() {
       setServerReady(false);
     }
 
+    function handleDjAuthStatus(payload) {
+      setDjUser(payload?.authenticated ? payload.user ?? null : null);
+    }
+
+    function handleDjLoginResult(payload) {
+      setDjLoginBusy(false);
+
+      if (!payload?.ok || !payload?.token) {
+        setDjLoginError(payload?.message || "Login failed.");
+        return;
+      }
+
+      setDjToken(payload.token);
+      writeStoredValue(STORAGE_KEYS.djToken, payload.token);
+      setDjUser(payload.user ?? null);
+      setDjPassword("");
+      setDjLoginError("");
+      setScreen("djDashboard");
+    }
+
+    function handleDjProfileResult(payload) {
+      setDjAccountMessage(payload?.message || "");
+      if (payload?.ok && payload?.user) {
+        setDjUser(payload.user);
+        setDjDisplayName("");
+      }
+    }
+
+    function handleDjPasswordResult(payload) {
+      setDjAccountMessage(payload?.message || "");
+      if (payload?.ok) {
+        setDjCurrentPassword("");
+        setDjNewPassword("");
+      }
+    }
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("server-state", handleServerState);
+    socket.on("dj-auth-status", handleDjAuthStatus);
+    socket.on("dj-login-result", handleDjLoginResult);
+    socket.on("dj-profile-result", handleDjProfileResult);
+    socket.on("dj-password-result", handleDjPasswordResult);
 
     if (socket.connected) handleConnect();
+
+    if (djToken) {
+      socket.emit("dj-auth-check", { token: djToken });
+    }
 
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("server-state", handleServerState);
+      socket.off("dj-auth-status", handleDjAuthStatus);
+      socket.off("dj-login-result", handleDjLoginResult);
+      socket.off("dj-profile-result", handleDjProfileResult);
+      socket.off("dj-password-result", handleDjPasswordResult);
     };
-  }, []);
+  }, [djToken]);
 
-  const filteredSongs = demoSongs.filter((song) => {
-                const query = search.trim().toLowerCase();
+  const isLive = Boolean(session.isLive);
 
-                return (
-                  song.title.toLowerCase().includes(query) ||
-                  song.artist.toLowerCase().includes(query)
-                );
-              });
+  function openDjArea() {
+    if (djUser && djToken) {
+      setScreen("djDashboard");
+      return;
+    }
+
+    setDjLoginError("");
+    setScreen("djLogin");
+  }
+
+  function submitDjLogin(event) {
+    event?.preventDefault?.();
+
+    if (!djUsername || !djPassword) {
+      setDjLoginError("Enter your DJ username and password.");
+      return;
+    }
+
+    setDjLoginBusy(true);
+    setDjLoginError("");
+    socket.emit("dj-login", {
+      username: djUsername,
+      password: djPassword,
+    });
+  }
+
+  function updateDjDisplayName(event) {
+    event?.preventDefault?.();
+    if (!djToken || !djDisplayName.trim()) return;
+
+    setDjAccountMessage("");
+    socket.emit("dj-profile-update", {
+      token: djToken,
+      displayName: djDisplayName.trim(),
+    });
+  }
+
+  function changeDjPassword(event) {
+    event?.preventDefault?.();
+
+    if (!djToken || !djCurrentPassword || !djNewPassword) {
+      setDjAccountMessage("Enter your current and new password.");
+      return;
+    }
+
+    setDjAccountMessage("");
+    socket.emit("dj-password-change", {
+      token: djToken,
+      currentPassword: djCurrentPassword,
+      newPassword: djNewPassword,
+    });
+  }
+
+  function logoutDj() {
+    if (djToken) socket.emit("dj-logout", { token: djToken });
+    setDjToken(null);
+    setDjUser(null);
+    writeStoredValue(STORAGE_KEYS.djToken, null);
+    setScreen("venueHome");
+  }
+
+  function startSession() {
+    if (!djToken) return openDjArea();
+    socket.emit("session-action", { type: "start", token: djToken });
+  }
+
+  function endSession() {
+    if (!djToken) return openDjArea();
+    socket.emit("session-action", { type: "end", token: djToken });
+  }
+
+  const backendBaseUrl =
+    import.meta.env.VITE_BACKEND_URL ||
+    `${window.location.protocol}//${window.location.hostname}:3001`;
+
+  useEffect(() => {
+    const query = search.trim();
+
+    if (query.length < 2) {
+      setSpotifySongs([]);
+      setSpotifySearching(false);
+      setSpotifyError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSpotifySearching(true);
+      setSpotifyError("");
+
+      try {
+        const response = await fetch(
+          `${backendBaseUrl}/api/spotify/search?q=${encodeURIComponent(query)}`,
+          { signal: controller.signal }
+        );
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "Spotify search failed.");
+        }
+
+        setSpotifySongs(Array.isArray(payload.tracks) ? payload.tracks : []);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setSpotifySongs([]);
+          setSpotifyError(error.message || "Spotify search failed.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setSpotifySearching(false);
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, backendBaseUrl]);
+
+  const filteredSongs =
+    search.trim().length >= 2 ? spotifySongs : demoSongs;
 
               const totalVotes =
                 crowdVotes.fire +
@@ -242,12 +445,48 @@ function App() {
                   return a.song.title.localeCompare(b.song.title);
                 });
 
+              function isSongSaved(song) {
+                return savedSongs.some(
+                  (savedSong) => savedSong.id === song?.id
+                );
+              }
+
+              function toggleSavedSong(song) {
+                if (!song?.id) return;
+
+                setSavedSongs((currentSongs) => {
+                  const alreadySaved = currentSongs.some(
+                    (savedSong) => savedSong.id === song.id
+                  );
+
+                  if (alreadySaved) {
+                    return currentSongs.filter(
+                      (savedSong) => savedSong.id !== song.id
+                    );
+                  }
+
+                  return [
+                    {
+                      ...song,
+                      savedAt: new Date().toISOString(),
+                    },
+                    ...currentSongs,
+                  ];
+                });
+              }
+
+              function openSavedSongs() {
+                setSearch("");
+                setScreen("savedSongs");
+              }
+
               function selectSong(song) {
+                if (!isLive) return;
                 setSelectedSong(song);
                 setScreen("requestForm");
               }
   function submitRequest() {
-    if (!selectedSong) return;
+    if (!selectedSong || !isLive) return;
 
     const newRequest = {
       id: `${Date.now()}-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
@@ -263,15 +502,25 @@ function App() {
       playedAt: null,
     };
 
-    setGuestRequestIds((currentIds) =>
-      currentIds.includes(newRequest.id)
-        ? currentIds
-        : [...currentIds, newRequest.id]
-    );
+    setRequestRuleMessage("");
 
-    setLastSubmittedRequestId(newRequest.id);
-    socket.emit("request-create", newRequest);
-    setScreen("requestSuccess");
+    socket.emit("request-create", newRequest, (result) => {
+      if (!result?.ok) {
+        setRequestRuleMessage(
+          result?.message || "That song cannot be requested right now."
+        );
+        return;
+      }
+
+      setGuestRequestIds((currentIds) =>
+        currentIds.includes(newRequest.id)
+          ? currentIds
+          : [...currentIds, newRequest.id]
+      );
+
+      setLastSubmittedRequestId(newRequest.id);
+      setScreen("requestSuccess");
+    });
   }
 
   function resetRequest() {
@@ -331,19 +580,19 @@ function App() {
                 return `#${index + 1}`;
               }
   function approveRequest(requestId) {
-    socket.emit("request-action", { type: "approve", requestId });
+    socket.emit("request-action", { type: "approve", requestId, token: djToken });
   }
 
   function declineRequest(requestId) {
-    socket.emit("request-action", { type: "decline", requestId });
+    socket.emit("request-action", { type: "decline", requestId, token: djToken });
   }
 
   function moveQueueItem(requestId, direction) {
-    socket.emit("request-action", { type: "move", requestId, direction });
+    socket.emit("request-action", { type: "move", requestId, direction, token: djToken });
   }
 
   function removeFromQueue(requestId) {
-    socket.emit("request-action", { type: "remove", requestId });
+    socket.emit("request-action", { type: "remove", requestId, token: djToken });
   }
 
   function loadToDeck(requestId, deckNumber) {
@@ -351,6 +600,7 @@ function App() {
       type: "load",
       requestId,
       deckNumber,
+      token: djToken,
     });
   }
 
@@ -358,11 +608,12 @@ function App() {
     socket.emit("request-action", {
       type: "return-to-queue",
       requestId,
+      token: djToken,
     });
   }
 
   function markPlayed(requestId) {
-    socket.emit("request-action", { type: "played", requestId });
+    socket.emit("request-action", { type: "played", requestId, token: djToken });
   }
 
   function formatRequestTime(timestamp) {
@@ -414,7 +665,17 @@ function App() {
               </button>
 
               <div className="mini-brand">
-                DJ LIVE <span>♕</span>
+                DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
               </div>
 
               <div className="top-spacer"></div>
@@ -539,6 +800,236 @@ function App() {
   }
 
 
+
+
+  if (screen === "djAccount") {
+    if (!djUser || !djToken) {
+      setTimeout(() => setScreen("djLogin"), 0);
+      return null;
+    }
+
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="request-page-content">
+            <div className="top-bar">
+              <button
+                className="back-button"
+                onClick={() => setScreen("djDashboard")}
+              >
+                ←
+              </button>
+
+              <div className="mini-brand">
+                DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
+              </div>
+
+              <div className="top-spacer"></div>
+            </div>
+
+            <div style={{ margin: "34px 0 24px" }}>
+              <p className="eyebrow">DJ ACCOUNT</p>
+              <h2 style={{ margin: 0, fontSize: "30px" }}>
+                {djUser?.displayName || djUser?.username}
+              </h2>
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  color: "#9199ad",
+                  fontSize: "13px",
+                }}
+              >
+                Login: {djUser?.username}
+              </p>
+            </div>
+
+            <form className="request-form" onSubmit={updateDjDisplayName}>
+              <label>Display / Stage Name</label>
+              <input
+                type="text"
+                value={djDisplayName}
+                onChange={(event) => setDjDisplayName(event.target.value)}
+                placeholder={djUser?.displayName || "DJ name"}
+                maxLength="40"
+              />
+
+              <button
+                className="send-request-button"
+                type="submit"
+                style={{ marginTop: "14px" }}
+              >
+                Save Display Name
+              </button>
+            </form>
+
+            <div
+              style={{
+                height: "1px",
+                background: "rgba(255,255,255,0.08)",
+                margin: "28px 0",
+              }}
+            />
+
+            <form className="request-form" onSubmit={changeDjPassword}>
+              <label>Current Password</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={djCurrentPassword}
+                onChange={(event) =>
+                  setDjCurrentPassword(event.target.value)
+                }
+                placeholder="Current password"
+              />
+
+              <label>New Password</label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={djNewPassword}
+                onChange={(event) =>
+                  setDjNewPassword(event.target.value)
+                }
+                placeholder="New password (8+ characters)"
+              />
+
+              <button
+                className="send-request-button"
+                type="submit"
+                style={{ marginTop: "14px" }}
+              >
+                Change Password
+              </button>
+            </form>
+
+            {djAccountMessage && (
+              <div
+                style={{
+                  marginTop: "18px",
+                  padding: "12px",
+                  border: "1px solid rgba(255,71,191,0.25)",
+                  borderRadius: "10px",
+                  color: "#d6d9e4",
+                  background: "rgba(255,71,191,0.06)",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                }}
+              >
+                {djAccountMessage}
+              </div>
+            )}
+
+            <button
+              className="secondary-button"
+              style={{ width: "100%", marginTop: "24px" }}
+              onClick={() => setScreen("djDashboard")}
+            >
+              Back to DJ Dashboard
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (screen === "djLogin") {
+    return (
+      <main className="app">
+        <section className="phone-shell request-shell">
+          <div className="glow glow-one"></div>
+          <div className="glow glow-two"></div>
+
+          <div className="request-page-content">
+            <div className="top-bar">
+              <button className="back-button" onClick={() => setScreen("venueHome")}>
+                ←
+              </button>
+              <div className="mini-brand">DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small></div>
+              <div className="top-spacer"></div>
+            </div>
+
+            <div style={{ margin: "34px 0 24px" }}>
+              <p className="eyebrow">AUTHORIZED DJs ONLY</p>
+              <h2 style={{ margin: 0, fontSize: "30px" }}>DJ Login</h2>
+              <p style={{ margin: "8px 0 0", color: "#9199ad", fontSize: "13px" }}>
+                Private Tipsys DJ access.
+              </p>
+            </div>
+
+            <form className="request-form" onSubmit={submitDjLogin}>
+              <label>DJ Username</label>
+              <input
+                type="text"
+                autoComplete="username"
+                value={djUsername}
+                onChange={(event) => setDjUsername(event.target.value)}
+                placeholder="Username"
+              />
+
+              <label>Password</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={djPassword}
+                onChange={(event) => setDjPassword(event.target.value)}
+                placeholder="Password"
+              />
+
+              {djLoginError && (
+                <div style={{
+                  marginTop: "12px", padding: "11px",
+                  border: "1px solid rgba(255,101,125,0.30)",
+                  borderRadius: "10px", color: "#ff9aac",
+                  background: "rgba(255,101,125,0.06)",
+                  fontSize: "10px", fontWeight: 800
+                }}>
+                  {djLoginError}
+                </div>
+              )}
+
+              <button
+                className="send-request-button"
+                type="submit"
+                disabled={djLoginBusy}
+                style={{ marginTop: "18px", opacity: djLoginBusy ? 0.6 : 1 }}
+              >
+                {djLoginBusy ? "Signing In..." : "⚡ Enter DJ Dashboard"}
+              </button>
+            </form>
+
+            <div className="success-note" style={{ marginTop: "16px" }}>
+              <span>🔒</span>
+              <p>Only the two pre-authorized DJ accounts can enter this dashboard.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
               /*
                 =========================
                 DJ DASHBOARD
@@ -546,6 +1037,11 @@ function App() {
               */
 
               if (screen === "djDashboard") {
+                if (!djUser || !djToken) {
+                  setTimeout(() => setScreen("djLogin"), 0);
+                  return null;
+                }
+
                 return (
                   <main
                     className="app"
@@ -591,7 +1087,17 @@ function App() {
                               className="mini-brand"
                               style={{ textAlign: "left" }}
                             >
-                              DJ LIVE <span>♕</span>
+                              DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                             </div>
 
                             <p
@@ -612,9 +1118,51 @@ function App() {
                               alignItems: "center",
                             }}
                           >
-                            <span className="large-live-pill">
-                              LIVE
+                            <span
+                              className="large-live-pill"
+                              style={{
+                                opacity: isLive ? 1 : 0.7,
+                                borderColor: isLive
+                                  ? "rgba(88,229,191,0.55)"
+                                  : "rgba(255,101,125,0.45)",
+                                color: isLive ? "#58e5bf" : "#ff657d",
+                              }}
+                            >
+                              {isLive ? "LIVE" : "OFFLINE"}
                             </span>
+
+                            <button
+                              className={isLive ? "secondary-button" : "primary-button"}
+                              style={{
+                                width: "auto",
+                                padding: "10px 15px",
+                              }}
+                              onClick={isLive ? endSession : startSession}
+                            >
+                              {isLive ? "End Session" : "Start Session"}
+                            </button>
+
+                            <span
+                              style={{ color: "#ff47bf", fontSize: "10px", fontWeight: 900 }}
+                            >
+                              {djUser?.displayName || djUser?.username}
+                            </span>
+
+                            <button
+                              className="secondary-button"
+                              style={{ width: "auto", padding: "10px 15px" }}
+                              onClick={() => setScreen("djAccount")}
+                            >
+                              Account
+                            </button>
+
+                            <button
+                              className="secondary-button"
+                              style={{ width: "auto", padding: "10px 15px" }}
+                              onClick={logoutDj}
+                            >
+                              Log Out
+                            </button>
 
                             <button
                               className="secondary-button"
@@ -1226,6 +1774,147 @@ function App() {
 
               /*
                 =========================
+                SAVED SONGS
+                =========================
+              */
+
+              if (screen === "savedSongs") {
+                return (
+                  <main className="app">
+                    <section className="phone-shell venue-shell">
+                      <div className="glow glow-one"></div>
+                      <div className="glow glow-two"></div>
+
+                      <div className="venue-content">
+                        <div className="top-bar">
+                          <button
+                            className="back-button"
+                            onClick={() => setScreen("venueHome")}
+                          >
+                            ←
+                          </button>
+
+                          <div className="mini-brand">
+                            DJ LIVE <span>♕</span>
+                          </div>
+
+                          <div className="top-spacer"></div>
+                        </div>
+
+                        <div className="venue-heading">
+                          <p className="eyebrow">
+                            {isLive ? "TIPSYS LIVE · BETA" : "TIPSYS OFFLINE · BETA"}
+                          </p>
+                          <h2>Saved Songs</h2>
+                          <p>
+                            Save tracks anytime. Request them when Tipsys is live.
+                          </p>
+                        </div>
+
+                        <div className="song-results">
+                          {savedSongs.length > 0 ? (
+                            savedSongs.map((song) => (
+                              <div
+                                className="song-result"
+                                key={song.id}
+                                style={{ cursor: "default" }}
+                              >
+                                <div
+                                  className={`song-art ${song.color || "purple"}`}
+                                  style={
+                                    song.image
+                                      ? {
+                                          backgroundImage: `url("${song.image}")`,
+                                          backgroundSize: "cover",
+                                          backgroundPosition: "center",
+                                        }
+                                      : undefined
+                                  }
+                                >
+                                  {song.image ? "" : "♫"}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isLive) {
+                                      selectSong(song);
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    textAlign: "left",
+                                    background: "transparent",
+                                    border: 0,
+                                    color: "inherit",
+                                    cursor: isLive ? "pointer" : "default",
+                                  }}
+                                >
+                                  <div className="song-copy">
+                                    <h3>{song.title}</h3>
+                                    <p>{song.artist}</p>
+                                    <span>{song.album}</span>
+                                  </div>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSavedSong(song)}
+                                  style={{
+                                    border: 0,
+                                    background: "transparent",
+                                    color: "#ff4fc8",
+                                    fontSize: "18px",
+                                    cursor: "pointer",
+                                  }}
+                                  title="Remove saved song"
+                                >
+                                  ★
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="no-results">
+                              <span>☆</span>
+                              <h3>No saved songs yet</h3>
+                              <p>
+                                Search Spotify and save tracks you want to request later.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "10px",
+                            marginTop: "16px",
+                          }}
+                        >
+                          <button
+                            className="secondary-button"
+                            onClick={() => setScreen("requestMusic")}
+                          >
+                            ⌕ Search Spotify
+                          </button>
+
+                          <button
+                            className="primary-button"
+                            onClick={() => setScreen("venueHome")}
+                          >
+                            Back Home
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  </main>
+                );
+              }
+
+              /*
+                =========================
                 MOST REQUESTED
                 =========================
               */
@@ -1249,7 +1938,17 @@ function App() {
                           </button>
 
                           <div className="mini-brand">
-                            DJ LIVE <span>♕</span>
+                            DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                           </div>
 
                           <div className="top-spacer"></div>
@@ -1439,7 +2138,15 @@ function App() {
                           </span>
                         </button>
 
-                        <div className="venue-footer">
+                        <button
+                      className="secondary-button"
+                      onClick={openSavedSongs}
+                      style={{ width: "100%", marginTop: "12px" }}
+                    >
+                      ★ Saved Songs ({savedSongs.length})
+                    </button>
+
+                    <div className="venue-footer">
                           <button
                             onClick={() =>
                               setScreen("venueHome")
@@ -1449,9 +2156,14 @@ function App() {
                           </button>
 
                           <button
-                            onClick={() =>
-                              setScreen("requestMusic")
-                            }
+                            disabled={!isLive}
+                            style={{
+                              opacity: isLive ? 1 : 0.35,
+                              cursor: isLive ? "pointer" : "not-allowed",
+                            }}
+                            onClick={() => {
+                              if (isLive) setScreen("requestMusic");
+                            }}
                           >
                             ⌕
                           </button>
@@ -1483,7 +2195,17 @@ function App() {
 
                       <div className="success-content">
                         <div className="mini-brand">
-                          DJ LIVE <span>♕</span>
+                          DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                         </div>
 
                         <div className="success-icon">
@@ -1608,7 +2330,17 @@ function App() {
                           </button>
 
                           <div className="mini-brand">
-                            DJ LIVE <span>♕</span>
+                            DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                           </div>
 
                           <div className="top-spacer"></div>
@@ -1704,11 +2436,44 @@ function App() {
                           </p>
                         </div>
 
+                        {requestRuleMessage && (
+                          <div
+                            style={{
+                              margin: "12px 0",
+                              padding: "12px",
+                              borderRadius: "10px",
+                              border: "1px solid rgba(255,101,125,0.35)",
+                              background: "rgba(255,101,125,0.07)",
+                              color: "#ff9aac",
+                              fontSize: "11px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {requestRuleMessage}
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => toggleSavedSong(selectedSong)}
+                          style={{ marginBottom: "10px" }}
+                        >
+                          {isSongSaved(selectedSong)
+                            ? "★ Saved — Remove"
+                            : "☆ Save Song for Later"}
+                        </button>
+
                         <button
                           className="send-request-button"
                           onClick={submitRequest}
+                          disabled={!isLive}
+                          style={{
+                            opacity: isLive ? 1 : 0.55,
+                            cursor: isLive ? "pointer" : "not-allowed",
+                          }}
                         >
-                          ⚡ Send Request
+                          {isLive ? "⚡ Send Request" : "Requests Closed"}
                         </button>
                       </div>
                     </section>
@@ -1741,7 +2506,17 @@ function App() {
                           </button>
 
                           <div className="mini-brand">
-                            DJ LIVE <span>♕</span>
+                            DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                           </div>
 
                           <div className="top-spacer"></div>
@@ -1749,7 +2524,7 @@ function App() {
 
                         <div className="request-page-heading">
                           <p className="eyebrow">
-                            TIPSYS · LIVE
+                            TIPSYS · {isLive ? "LIVE" : "OFFLINE"}
                           </p>
 
                           <h2>Request Music</h2>
@@ -1796,7 +2571,7 @@ function App() {
                         <div className="song-results-header">
                           <span>
                             {search
-                              ? "SEARCH RESULTS"
+                              ? "SPOTIFY SEARCH"
                               : "POPULAR TONIGHT"}
                           </span>
 
@@ -1806,7 +2581,19 @@ function App() {
                         </div>
 
                         <div className="song-results">
-                          {filteredSongs.length > 0 ? (
+                          {spotifySearching ? (
+                            <div className="no-results">
+                              <span>⌕</span>
+                              <h3>Searching Spotify...</h3>
+                              <p>Finding tracks from the Spotify catalog.</p>
+                            </div>
+                          ) : spotifyError ? (
+                            <div className="no-results">
+                              <span>!</span>
+                              <h3>Spotify search unavailable</h3>
+                              <p>{spotifyError}</p>
+                            </div>
+                          ) : filteredSongs.length > 0 ? (
                             filteredSongs.map((song) => (
                               <button
                                 className="song-result"
@@ -1816,9 +2603,18 @@ function App() {
                                 }
                               >
                                 <div
-                                  className={`song-art ${song.color}`}
+                                  className={`song-art ${song.color || "purple"}`}
+                                  style={
+                                    song.image
+                                      ? {
+                                          backgroundImage: `url("${song.image}")`,
+                                          backgroundSize: "cover",
+                                          backgroundPosition: "center",
+                                        }
+                                      : undefined
+                                  }
                                 >
-                                  ♫
+                                  {song.image ? "" : "♫"}
                                 </div>
 
                                 <div className="song-result-info">
@@ -1906,14 +2702,22 @@ function App() {
                           </button>
 
                           <div className="mini-brand">
-                            DJ LIVE <span>♕</span>
+                            DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                           </div>
 
                           <button
                             className="more-button"
-                            onClick={() =>
-                              setScreen("djDashboard")
-                            }
+                            onClick={openDjArea}
                           >
                             •••
                           </button>
@@ -1922,7 +2726,7 @@ function App() {
                         <div className="venue-live-header">
                           <div>
                             <p className="eyebrow">
-                              LIVE VENUE
+                              {isLive ? "LIVE VENUE" : "VENUE OFFLINE"}
                             </p>
 
                             <h2>Tipsys</h2>
@@ -1932,104 +2736,130 @@ function App() {
                             </p>
                           </div>
 
-                          <span className="large-live-pill">
-                            LIVE
+                          <span
+                            className="large-live-pill"
+                            style={{
+                              opacity: isLive ? 1 : 0.7,
+                              borderColor: isLive
+                                ? "rgba(88,229,191,0.55)"
+                                : "rgba(255,101,125,0.45)",
+                              color: isLive ? "#58e5bf" : "#ff657d",
+                            }}
+                          >
+                            {isLive ? "LIVE" : "OFFLINE"}
                           </span>
                         </div>
 
-                        <section className="now-playing-card">
-                          <div className="album-art">
-                            <div className="album-glow"></div>
-                            <span>♫</span>
-                          </div>
+                        {isLive ? (
+                          <>
+                            <section className="now-playing-card">
+                              <div className="album-art">
+                                <div className="album-glow"></div>
+                                <span>♫</span>
+                              </div>
 
-                          <div className="now-playing-label">
-                            NOW PLAYING
-                          </div>
+                              <div className="now-playing-label">
+                                NOW PLAYING
+                              </div>
 
-                          <h3>Yeah!</h3>
+                              <h3>Yeah!</h3>
 
-                          <p>
-                            Usher · Lil Jon · Ludacris
-                          </p>
+                              <p>Usher · Lil Jon · Ludacris</p>
 
-                          <div className="song-progress">
-                            <div className="song-progress-fill"></div>
-                          </div>
+                              <div className="song-progress">
+                                <div className="song-progress-fill"></div>
+                              </div>
 
-                          <div className="song-time">
-                            <span>1:42</span>
-                            <span>4:10</span>
-                          </div>
-                        </section>
+                              <div className="song-time">
+                                <span>1:42</span>
+                                <span>4:10</span>
+                              </div>
+                            </section>
 
-                        <section className="crowd-section">
-                          <div className="section-heading-row">
-                            <div>
-                              <p className="eyebrow">
-                                CROWD REACTION
-                              </p>
+                            <section className="crowd-section">
+                              <div className="section-heading-row">
+                                <div>
+                                  <p className="eyebrow">CROWD REACTION</p>
+                                  <h3>How's the track?</h3>
+                                </div>
 
-                              <h3>How's the track?</h3>
+                                <div className="crowd-score">
+                                  {crowdScore}%
+                                </div>
+                              </div>
+
+                              <div className="reaction-grid">
+                                {[
+                                  ["fire", "🔥", "Fire"],
+                                  ["good", "👍", "Good"],
+                                  ["meh", "😐", "Meh"],
+                                  ["skip", "⏭", "Skip"],
+                                ].map(([key, emoji, label]) => (
+                                  <button
+                                    key={key}
+                                    className="reaction-button"
+                                    style={reactionStyle(key)}
+                                    onClick={() => handleReaction(key)}
+                                  >
+                                    <span>{emoji}</span>
+                                    <small>
+                                      {label} · {crowdVotes[key]}
+                                    </small>
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+                          </>
+                        ) : (
+                          <section className="now-playing-card">
+                            <div className="album-art">
+                              <div className="album-glow"></div>
+                              <span>☾</span>
                             </div>
 
-                            <div className="crowd-score">
-                              {crowdScore}%
+                            <div className="now-playing-label">
+                              NO LIVE SESSION
                             </div>
-                          </div>
 
-                          <div className="reaction-grid">
-                            {[
-                              ["fire", "🔥", "Fire"],
-                              ["good", "👍", "Good"],
-                              ["meh", "😐", "Meh"],
-                              ["skip", "⏭", "Skip"],
-                            ].map(
-                              ([key, emoji, label]) => (
-                                <button
-                                  key={key}
-                                  className="reaction-button"
-                                  style={reactionStyle(key)}
-                                  onClick={() =>
-                                    handleReaction(key)
-                                  }
-                                >
-                                  <span>{emoji}</span>
+                            <h3>Tipsys is offline</h3>
 
-                                  <small>
-                                    {label} ·{" "}
-                                    {crowdVotes[key]}
-                                  </small>
-                                </button>
-                              )
-                            )}
-                          </div>
-                        </section>
+                            <p>
+                              Requests open when the DJ starts tonight&apos;s session.
+                            </p>
+                          </section>
+                        )}
 
                         <button
                           className="request-song-button"
-                          onClick={() =>
-                            setScreen("requestMusic")
-                          }
+                          disabled={!isLive}
+                          style={{
+                            opacity: isLive ? 1 : 0.55,
+                            cursor: isLive ? "pointer" : "not-allowed",
+                          }}
+                          onClick={() => {
+                            if (isLive) setScreen("requestMusic");
+                          }}
                         >
                           <div>
                             <span className="request-icon">
-                              ＋
+                              {isLive ? "＋" : "×"}
                             </span>
                           </div>
 
                           <div className="request-button-text">
                             <strong>
-                              Request a Song
+                              {isLive ? "Request a Song" : "Requests Closed"}
                             </strong>
 
                             <small>
-                              Search music and send it to the DJ
+                              {isLive
+                                ? "Search music and send it to the DJ"
+                                : "Requests open when the DJ starts a session"}
                             </small>
                           </div>
 
                           <span className="request-arrow">
-                            ›
+                            {isLive ? "›" : "•"}
                           </span>
                         </button>
 
@@ -2104,9 +2934,7 @@ function App() {
                           </button>
 
                           <button
-                            onClick={() =>
-                              setScreen("djDashboard")
-                            }
+                            onClick={openDjArea}
                           >
                             ☰
                           </button>
@@ -2142,7 +2970,17 @@ function App() {
                           </button>
 
                           <div className="mini-brand">
-                            DJ LIVE <span>♕</span>
+                            DJ LIVE <span>♕</span>{" "}
+                            <small
+                              style={{
+                                fontSize: "8px",
+                                color: "#58e5bf",
+                                letterSpacing: "1px",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              BETA
+                            </small>
                           </div>
 
                           <div className="top-spacer"></div>
@@ -2170,19 +3008,22 @@ function App() {
                         </div>
 
                         <div className="section-title">
-                          <span>Nearby Venues</span>
+                          <span>Beta Venue</span>
 
-                          <span className="live-label">
-                            LIVE
+                          <span
+                            className="live-label"
+                            style={{
+                              color: isLive ? "#58e5bf" : "#ff657d",
+                            }}
+                          >
+                            {isLive ? "LIVE" : "OFFLINE"}
                           </span>
                         </div>
 
                         <div className="venue-list">
                           <button
                             className="venue-card active-venue"
-                            onClick={() =>
-                              setScreen("venueHome")
-                            }
+                            onClick={() => setScreen("venueHome")}
                           >
                             <div className="venue-image tipsys-image">
                               T
@@ -2192,52 +3033,32 @@ function App() {
                               <div className="venue-name-row">
                                 <h3>Tipsys</h3>
 
-                                <span className="live-pill">
-                                  LIVE
+                                <span
+                                  className="live-pill"
+                                  style={{
+                                    color: isLive ? "#58e5bf" : "#ff657d",
+                                    borderColor: isLive
+                                      ? "rgba(88,229,191,0.45)"
+                                      : "rgba(255,101,125,0.45)",
+                                  }}
+                                >
+                                  {isLive ? "LIVE" : "OFFLINE"}
                                 </span>
                               </div>
 
-                              <p>0.3 mi · Live Now</p>
+                              <p>
+                                {isLive
+                                  ? "DJ Live session active"
+                                  : "Requests currently closed"}
+                              </p>
 
                               <span className="venue-type">
-                                Bar · Nightlife
+                                Tipsys · Inner-Circle Beta
                               </span>
                             </div>
 
-                            <span className="venue-arrow">
-                              ›
-                            </span>
+                            <span className="venue-arrow">›</span>
                           </button>
-
-                          {[
-                            ["H", "The Hideout", "1.4 mi", "Bar · Nightlife"],
-                            ["B", "Bar 101", "2.1 mi", "Bar · Music"],
-                            ["R", "Riverside Pub", "3.5 mi", "Pub · Nightlife"],
-                          ].map(
-                            ([letter, name, distance, type]) => (
-                              <button
-                                className="venue-card"
-                                key={name}
-                              >
-                                <div className="venue-image">
-                                  {letter}
-                                </div>
-
-                                <div className="venue-info">
-                                  <h3>{name}</h3>
-                                  <p>{distance}</p>
-
-                                  <span className="venue-type">
-                                    {type}
-                                  </span>
-                                </div>
-
-                                <span className="venue-arrow">
-                                  ›
-                                </span>
-                              </button>
-                            )
-                          )}
                         </div>
 
                         <div className="venue-footer">
