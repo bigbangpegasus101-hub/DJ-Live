@@ -734,37 +734,77 @@ function normalizeTrackText(value) {
 function trackMatchScore(request, incoming) {
   const requestedTitle = normalizeTrackText(request?.song?.title);
   const requestedArtist = normalizeTrackText(request?.song?.artist);
+
   const incomingTitle = normalizeTrackText(incoming?.title);
   const incomingArtist = normalizeTrackText(incoming?.artist);
+  const incomingRawText = normalizeTrackText(incoming?.rawText);
 
-  if (!requestedTitle || !incomingTitle) return 0;
+  // Existing structured title + artist matching.
+  if (incomingTitle) {
+    let score = 0;
 
-  let score = 0;
-  if (requestedTitle === incomingTitle) score += 70;
-  else if (
-    requestedTitle.includes(incomingTitle) ||
-    incomingTitle.includes(requestedTitle)
-  ) score += 55;
-
-  if (requestedArtist && incomingArtist) {
-    if (requestedArtist === incomingArtist) score += 30;
+    if (requestedTitle === incomingTitle) score += 70;
     else if (
-      requestedArtist.includes(incomingArtist) ||
-      incomingArtist.includes(requestedArtist)
-    ) score += 20;
+      requestedTitle.includes(incomingTitle) ||
+      incomingTitle.includes(requestedTitle)
+    ) {
+      score += 55;
+    }
+
+    if (requestedArtist && incomingArtist) {
+      if (requestedArtist === incomingArtist) score += 30;
+      else if (
+        requestedArtist.includes(incomingArtist) ||
+        incomingArtist.includes(requestedArtist)
+      ) {
+        score += 20;
+      }
+    }
+
+    return score;
   }
 
-  return score;
+  // Raw Serato OCR matching.
+  // Example:
+  // "Without Me [E] Eminem"
+  // becomes:
+  // "without me e eminem"
+  //
+  // We do not try to guess where the title ends and artist begins.
+  // Instead, compare the known Spotify title/artist against the whole OCR string.
+  if (incomingRawText && requestedTitle) {
+    let score = 0;
+
+    if (incomingRawText.includes(requestedTitle)) {
+      score += 70;
+    }
+
+    if (requestedArtist && incomingRawText.includes(requestedArtist)) {
+      score += 30;
+    }
+
+    return score;
+  }
+
+  return 0;
 }
 
-function applySeratoLoadedTrack({ deck, title, artist }) {
+function applySeratoLoadedTrack({ deck, title, artist, rawText }) {
   const deckNumber = Number(deck);
-  if (![1, 2].includes(deckNumber) || !title) {
+  const hasStructuredTrack = Boolean(title);
+  const hasRawTrack = Boolean(rawText);
+
+  if (![1, 2].includes(deckNumber) || (!hasStructuredTrack && !hasRawTrack)) {
     return { ok: false, message: "Invalid Serato deck event." };
   }
 
   seratoBridge.lastSeenAt = new Date().toISOString();
-  seratoBridge.lastEvent = { deck: deckNumber, title, artist: artist || "" };
+  seratoBridge.lastEvent = {
+    deck: deckNumber,
+    title: title || "",
+    artist: artist || "",
+    rawText: rawText || "",
+  };
 
   const candidates = state.requests.filter((request) =>
     ["pending", "queued"].includes(request.status)
@@ -773,7 +813,7 @@ function applySeratoLoadedTrack({ deck, title, artist }) {
   const ranked = candidates
     .map((request) => ({
       request,
-      score: trackMatchScore(request, { title, artist }),
+      score: trackMatchScore(request, { title, artist, rawText }),
     }))
     .filter((item) => item.score >= 70)
     .sort((a, b) => b.score - a.score);
@@ -791,9 +831,11 @@ function applySeratoLoadedTrack({ deck, title, artist }) {
   // If this requested track was still pending, approve it into the lifecycle.
   if (match.status === "pending") {
     match.status = "queued";
+
     const queueCount = state.requests.filter(
       (request) => request.status === "queued" && request.id !== match.id
     ).length;
+
     match.queuePosition = queueCount + 1;
   }
 
@@ -820,9 +862,12 @@ function applySeratoLoadedTrack({ deck, title, artist }) {
   saveState();
   broadcastState();
 
+  const receivedTrack =
+    rawText || `${title} - ${artist || "Unknown Artist"}`;
+
   console.log("");
   console.log("SERATO AUTO-MATCH");
-  console.log(`Deck ${deckNumber}: ${title} - ${artist || "Unknown Artist"}`);
+  console.log(`Deck ${deckNumber}: ${receivedTrack}`);
   console.log(`Matched request: ${match.song.title} - ${match.song.artist}`);
 
   return {
