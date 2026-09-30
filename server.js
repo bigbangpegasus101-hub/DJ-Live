@@ -765,26 +765,60 @@ function trackMatchScore(request, incoming) {
   }
 
   // Raw Serato OCR matching.
-  // Example:
-  // "Without Me [E] Eminem"
-  // becomes:
-  // "without me e eminem"
-  //
-  // We do not try to guess where the title ends and artist begins.
-  // Instead, compare the known Spotify title/artist against the whole OCR string.
-  if (incomingRawText && requestedTitle) {
-    let score = 0;
+if (incomingRawText && requestedTitle) {
+  const compactRaw = incomingRawText.replace(/\s+/g, "");
+  const compactTitle = requestedTitle.replace(/\s+/g, "");
 
-    if (incomingRawText.includes(requestedTitle)) {
-      score += 70;
-    }
-
-    if (requestedArtist && incomingRawText.includes(requestedArtist)) {
-      score += 30;
-    }
-
-    return score;
+  // Exact/contained title match.
+  if (
+    incomingRawText.includes(requestedTitle) ||
+    compactRaw.includes(compactTitle)
+  ) {
+    return 70;
   }
+
+  // Small OCR typo tolerance using Levenshtein distance.
+  const words = incomingRawText.split(" ").filter(Boolean);
+
+  for (let start = 0; start < words.length; start += 1) {
+    let candidate = "";
+
+    for (let end = start; end < words.length; end += 1) {
+      candidate += words[end];
+
+      if (Math.abs(candidate.length - compactTitle.length) > 2) {
+        if (candidate.length > compactTitle.length + 2) break;
+        continue;
+      }
+
+      const rows = Array.from(
+        { length: candidate.length + 1 },
+        () => Array(compactTitle.length + 1).fill(0)
+      );
+
+      for (let i = 0; i <= candidate.length; i += 1) rows[i][0] = i;
+      for (let j = 0; j <= compactTitle.length; j += 1) rows[0][j] = j;
+
+      for (let i = 1; i <= candidate.length; i += 1) {
+        for (let j = 1; j <= compactTitle.length; j += 1) {
+          const cost = candidate[i - 1] === compactTitle[j - 1] ? 0 : 1;
+
+          rows[i][j] = Math.min(
+            rows[i - 1][j] + 1,
+            rows[i][j - 1] + 1,
+            rows[i - 1][j - 1] + cost
+          );
+        }
+      }
+
+      if (rows[candidate.length][compactTitle.length] <= 1) {
+        return 70;
+      }
+    }
+  }
+
+  return 0;
+}
 
   return 0;
 }
