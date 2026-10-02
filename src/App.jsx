@@ -334,7 +334,7 @@ function App() {
 
   const backendBaseUrl =
     import.meta.env.VITE_BACKEND_URL ||
-    `${window.location.protocol}//${window.location.hostname}:3001`;
+   window.location.origin;
 
   useEffect(() => {
     const query = search.trim();
